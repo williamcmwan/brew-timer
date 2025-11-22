@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppProvider, useApp } from "./contexts/AppContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Brew from "./pages/Brew";
 import Settings from "./pages/Settings";
 import Grinders from "./pages/Grinders";
 import Brewers from "./pages/Brewers";
@@ -75,6 +76,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CoffeeBeans />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/brew"
+              element={
+                <ProtectedRoute>
+                  <Brew />
                 </ProtectedRoute>
               }
             />
