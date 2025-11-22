@@ -313,32 +313,17 @@ export default function Brew() {
             {/* Step 2: Adjust Parameters */}
             {step === 2 && (
               <div className="space-y-4 animate-fade-in">
-                {selectedRecipe && (
-                  <Card className="bg-cream/50">
-                    <CardContent className="pt-6">
-                      <h4 className="font-medium mb-2">Recipe Reference</h4>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>Ratio: {selectedRecipe.ratio}</div>
-                        <div>Dose: {selectedRecipe.dose}g</div>
-                        <div>Grind: {selectedRecipe.grindSize}</div>
-                        <div>Water: {selectedRecipe.water}g</div>
-                        <div>Yield: {selectedRecipe.yield}g</div>
-                        <div>Temp: {selectedRecipe.temperature}°C</div>
-                        <div className="col-span-2">Time: {selectedRecipe.brewTime}</div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
                 <p className="text-sm text-muted-foreground">
-                  Adjust parameters for this brew (pre-filled from recipe)
+                  Adjust parameters for this brew
                 </p>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="dose" className="flex items-center gap-2">
-                      <Scale className="h-4 w-4" />
-                      Dose (g)
+                    <Label htmlFor="dose">
+                      <span className="flex items-center gap-2">
+                        <Scale className="h-4 w-4" />
+                        Dose (g)
+                      </span>
                     </Label>
                     <Input
                       id="dose"
@@ -362,9 +347,11 @@ export default function Brew() {
                   </div>
 
                   <div>
-                    <Label htmlFor="water" className="flex items-center gap-2">
-                      <Droplets className="h-4 w-4" />
-                      Water (g)
+                    <Label htmlFor="water">
+                      <span className="flex items-center gap-2">
+                        <Droplets className="h-4 w-4" />
+                        Water (g)
+                      </span>
                     </Label>
                     <Input
                       id="water"
@@ -387,9 +374,11 @@ export default function Brew() {
                   </div>
 
                   <div>
-                    <Label htmlFor="temperature" className="flex items-center gap-2">
-                      <Thermometer className="h-4 w-4" />
-                      Temperature (°C)
+                    <Label htmlFor="temperature">
+                      <span className="flex items-center gap-2">
+                        <Thermometer className="h-4 w-4" />
+                        Temp (°C)
+                      </span>
                     </Label>
                     <Input
                       id="temperature"
@@ -401,9 +390,11 @@ export default function Brew() {
                   </div>
 
                   <div>
-                    <Label htmlFor="brewTime" className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Brew Time
+                    <Label htmlFor="brewTime">
+                      <span className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Brew Time
+                      </span>
                     </Label>
                     <Input
                       id="brewTime"
