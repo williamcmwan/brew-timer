@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,12 +27,21 @@ import { toast } from "@/hooks/use-toast";
 
 export default function BrewHistory() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { brews, coffeeBeans, grinders, brewers, recipes, toggleBrewFavorite, brewTemplates } = useApp();
   
   const [filterBean, setFilterBean] = useState<string>("all");
   const [filterRating, setFilterRating] = useState<string>("all");
   const [filterFavorites, setFilterFavorites] = useState<string>("all");
   const [sortBy, setSortBy] = useState<string>("date-desc");
+  const [openBrewId, setOpenBrewId] = useState<string | null>(null);
+
+  // Open specific brew if navigated from dashboard
+  useEffect(() => {
+    if (location.state?.brewId) {
+      setOpenBrewId(location.state.brewId);
+    }
+  }, [location.state]);
 
   // Helper functions to get entity names
   const getBeanName = (beanId: string) => {
@@ -284,7 +293,11 @@ export default function BrewHistory() {
             ) : (
               <div className="space-y-4">
                 {filteredAndSortedBrews.map((brew) => (
-                  <Collapsible key={brew.id}>
+                  <Collapsible 
+                    key={brew.id}
+                    open={openBrewId === brew.id}
+                    onOpenChange={(isOpen) => setOpenBrewId(isOpen ? brew.id : null)}
+                  >
                     <Card className="overflow-hidden hover:shadow-md transition-shadow">
                       <CollapsibleTrigger className="w-full">
                         <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">

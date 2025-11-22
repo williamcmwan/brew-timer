@@ -2,10 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Coffee, Settings, Plus, History, TrendingUp, GitCompare, Package } from "lucide-react";
+import { Coffee, Settings, Plus, History, TrendingUp, GitCompare, Package, Star } from "lucide-react";
 
 export default function Dashboard() {
-  const { user, brews, logout } = useApp();
+  const { user, brews, coffeeBeans, recipes, logout } = useApp();
   const navigate = useNavigate();
 
   const recentBrews = brews.slice(0, 5);
@@ -69,25 +69,41 @@ export default function Dashboard() {
               </p>
             ) : (
               <div className="space-y-3">
-                {recentBrews.map((brew) => (
-                  <div
-                    key={brew.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                  >
-                    <div>
-                      <p className="font-medium text-sm">Brew #{brew.id.slice(0, 6)}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(brew.date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    {brew.rating && (
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm font-medium">{brew.rating}</span>
-                        <span className="text-xs text-muted-foreground">/5</span>
+                {recentBrews.map((brew) => {
+                  const bean = coffeeBeans.find(b => b.id === brew.coffeeBeanId);
+                  const recipe = recipes.find(r => r.id === brew.recipeId);
+                  const displayImage = brew.photo || bean?.photo;
+                  
+                  return (
+                    <div
+                      key={brew.id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                      onClick={() => navigate("/history", { state: { brewId: brew.id } })}
+                    >
+                      {displayImage && (
+                        <img 
+                          src={displayImage} 
+                          alt="Brew" 
+                          className="w-16 h-16 object-cover rounded-md"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">
+                          {bean?.name || "Unknown Bean"} - {recipe?.name || "Custom"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(brew.date).toLocaleDateString()}
+                        </p>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {brew.rating && (
+                        <div className="flex items-center gap-1">
+                          <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                          <span className="text-sm font-medium">{brew.rating}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
