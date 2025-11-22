@@ -484,7 +484,6 @@ export default function Brew() {
                       <SelectValue placeholder="No template" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No template</SelectItem>
                       {brewTemplates.map((template) => (
                         <SelectItem key={template.id} value={template.id}>
                           {template.name}
