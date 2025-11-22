@@ -177,24 +177,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const login = async (email: string, password: string) => {
     const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const user = users.find((u: any) => u.email === email && u.password === password);
+    const user = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
     if (user) {
       const loggedInUser = { email: user.email, name: user.name };
       setUser(loggedInUser);
       localStorage.setItem("user", JSON.stringify(loggedInUser));
     } else {
-      throw new Error("Invalid credentials");
+      const emailExists = users.find((u: any) => u.email.toLowerCase() === email.toLowerCase());
+      if (emailExists) {
+        throw new Error("Incorrect password");
+      } else {
+        throw new Error("No account found with this email. Please sign up first.");
+      }
     }
   };
 
   const signup = async (email: string, password: string, name: string) => {
     const users = JSON.parse(localStorage.getItem("users") || "[]");
-    if (users.find((u: any) => u.email === email)) {
-      throw new Error("User already exists");
+    if (users.find((u: any) => u.email.toLowerCase() === email.toLowerCase())) {
+      throw new Error("An account with this email already exists");
     }
-    users.push({ email, password, name });
+    if (password.length < 6) {
+      throw new Error("Password must be at least 6 characters long");
+    }
+    users.push({ email: email.toLowerCase(), password, name });
     localStorage.setItem("users", JSON.stringify(users));
-    const newUser = { email, name };
+    const newUser = { email: email.toLowerCase(), name };
     setUser(newUser);
     localStorage.setItem("user", JSON.stringify(newUser));
   };
