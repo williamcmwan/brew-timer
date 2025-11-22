@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Plus, Pencil, Trash2, BookOpen } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Timer } from "lucide-react";
 import { RecipeDialog } from "@/components/equipment/RecipeDialog";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -101,6 +101,14 @@ export default function Recipes() {
                           {recipe.temperature}°C • {recipe.brewTime}
                         </p>
                       </div>
+                      <Button 
+                        onClick={() => navigate('/brew-timer', { state: { recipeId: recipe.id } })}
+                        size="sm"
+                        className="self-start"
+                      >
+                        <Timer className="h-4 w-4 mr-2" />
+                        Timer
+                      </Button>
                     </div>
                     <div className="flex gap-2">
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(recipe)}>

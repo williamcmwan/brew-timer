@@ -10,6 +10,7 @@ import Brew from "./pages/Brew";
 import BrewHistory from "./pages/BrewHistory";
 import Analytics from "./pages/Analytics";
 import BrewComparison from "./pages/BrewComparison";
+import BrewTimer from "./pages/BrewTimer";
 import Settings from "./pages/Settings";
 import Grinders from "./pages/Grinders";
 import Brewers from "./pages/Brewers";
@@ -111,6 +112,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BrewComparison />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/brew-timer"
+              element={
+                <ProtectedRoute>
+                  <BrewTimer />
                 </ProtectedRoute>
               }
             />
