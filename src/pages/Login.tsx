@@ -13,25 +13,41 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const { login, signup } = useApp();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    
     try {
       if (isLogin) {
-        await login(email, password);
+        await login(email.trim(), password);
+        toast({
+          title: "Welcome back!",
+          description: "You've successfully logged in",
+        });
       } else {
-        await signup(email, password, name);
+        if (!name.trim()) {
+          throw new Error("Please enter your name");
+        }
+        await signup(email.trim(), password, name.trim());
+        toast({
+          title: "Account created!",
+          description: "Welcome to your brew journal",
+        });
       }
       navigate("/dashboard");
     } catch (error) {
       toast({
-        title: "Error",
+        title: isLogin ? "Login failed" : "Sign up failed",
         description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -90,15 +106,21 @@ export default function Login() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full">
-              {isLogin ? "Sign in" : "Sign up"}
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? "Please wait..." : (isLogin ? "Sign in" : "Sign up")}
             </Button>
           </form>
           <div className="mt-4 text-center text-sm">
             <button
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setEmail("");
+                setPassword("");
+                setName("");
+              }}
               className="text-primary hover:underline"
+              disabled={isLoading}
             >
               {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
             </button>
