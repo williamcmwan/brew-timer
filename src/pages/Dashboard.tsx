@@ -1,0 +1,101 @@
+import { useNavigate } from "react-router-dom";
+import { useApp } from "@/contexts/AppContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Coffee, Settings, Plus, History } from "lucide-react";
+
+export default function Dashboard() {
+  const { user, brews, logout } = useApp();
+  const navigate = useNavigate();
+
+  const recentBrews = brews.slice(0, 5);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
+      <div className="container max-w-lg mx-auto p-4 space-y-6">
+        <div className="flex items-center justify-between pt-4">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Hello, {user?.name}</h1>
+            <p className="text-sm text-muted-foreground">Ready to brew?</p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
+            <Settings className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm opacity-90 mb-2">Start brewing</p>
+                <h2 className="text-xl font-bold">New Brew Session</h2>
+              </div>
+              <Button
+                size="lg"
+                variant="secondary"
+                onClick={() => navigate("/brew")}
+                className="rounded-full h-14 w-14"
+              >
+                <Plus className="h-6 w-6" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/settings")}>
+            <CardContent className="p-6 text-center">
+              <Coffee className="h-8 w-8 mx-auto mb-2 text-primary" />
+              <p className="font-medium text-sm">Equipment</p>
+            </CardContent>
+          </Card>
+          <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/history")}>
+            <CardContent className="p-6 text-center">
+              <History className="h-8 w-8 mx-auto mb-2 text-primary" />
+              <p className="font-medium text-sm">History</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Recent Brews</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {recentBrews.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                No brews yet. Start your first brew session!
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recentBrews.map((brew) => (
+                  <div
+                    key={brew.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">Brew #{brew.id.slice(0, 6)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(brew.date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    {brew.rating && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-medium">{brew.rating}</span>
+                        <span className="text-xs text-muted-foreground">/5</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Button variant="outline" className="w-full" onClick={logout}>
+          Sign out
+        </Button>
+      </div>
+    </div>
+  );
+}
