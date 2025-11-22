@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Brew from "./pages/Brew";
 import BrewHistory from "./pages/BrewHistory";
+import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Grinders from "./pages/Grinders";
 import Brewers from "./pages/Brewers";
@@ -93,6 +94,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BrewHistory />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/analytics"
+              element={
+                <ProtectedRoute>
+                  <Analytics />
                 </ProtectedRoute>
               }
             />
