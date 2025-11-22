@@ -1,0 +1,489 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useApp } from "@/contexts/AppContext";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft, Coffee, Droplets, Thermometer, Clock, Scale, Star } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+
+export default function Brew() {
+  const navigate = useNavigate();
+  const { coffeeBeans, grinders, brewers, recipes, addBrew } = useApp();
+  
+  const [step, setStep] = useState(1);
+  const [selectedBeanId, setSelectedBeanId] = useState("");
+  const [selectedBatchId, setSelectedBatchId] = useState("");
+  const [selectedGrinderId, setSelectedGrinderId] = useState("");
+  const [selectedBrewerId, setSelectedBrewerId] = useState("");
+  const [selectedRecipeId, setSelectedRecipeId] = useState("");
+  
+  // Brew parameters
+  const [dose, setDose] = useState("");
+  const [grindSize, setGrindSize] = useState("");
+  const [water, setWater] = useState("");
+  const [yieldAmount, setYieldAmount] = useState("");
+  const [temperature, setTemperature] = useState("");
+  const [brewTime, setBrewTime] = useState("");
+  
+  // Post-brew data
+  const [tds, setTds] = useState("");
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [photo, setPhoto] = useState("");
+
+  const selectedBean = coffeeBeans.find(b => b.id === selectedBeanId);
+  const selectedBatch = selectedBean?.batches.find(b => b.id === selectedBatchId);
+  const selectedGrinder = grinders.find(g => g.id === selectedGrinderId);
+  const selectedBrewer = brewers.find(b => b.id === selectedBrewerId);
+  const selectedRecipe = recipes.find(r => r.id === selectedRecipeId);
+  
+  const filteredRecipes = recipes.filter(
+    r => r.grinderId === selectedGrinderId && r.brewerId === selectedBrewerId
+  );
+
+  const calculateEY = () => {
+    if (!tds || !yieldAmount || !dose) return null;
+    const tdsNum = parseFloat(tds);
+    const yieldNum = parseFloat(yieldAmount);
+    const doseNum = parseFloat(dose);
+    return ((tdsNum * yieldNum / doseNum) * 100).toFixed(2);
+  };
+
+  const handleNext = () => {
+    if (step === 1 && (!selectedBeanId || !selectedBatchId)) {
+      toast({ title: "Please select a coffee bean and batch", variant: "destructive" });
+      return;
+    }
+    if (step === 2 && !selectedGrinderId) {
+      toast({ title: "Please select a grinder", variant: "destructive" });
+      return;
+    }
+    if (step === 3 && !selectedBrewerId) {
+      toast({ title: "Please select a brewer", variant: "destructive" });
+      return;
+    }
+    if (step === 4 && !selectedRecipeId) {
+      toast({ title: "Please select a recipe", variant: "destructive" });
+      return;
+    }
+    if (step === 5) {
+      if (!dose || !grindSize || !water || !yieldAmount || !temperature || !brewTime) {
+        toast({ title: "Please fill in all brew parameters", variant: "destructive" });
+        return;
+      }
+    }
+    setStep(step + 1);
+  };
+
+  const handleBack = () => {
+    if (step > 1) setStep(step - 1);
+    else navigate("/");
+  };
+
+  const handleSaveBrew = () => {
+    if (!tds) {
+      toast({ title: "Please enter TDS value", variant: "destructive" });
+      return;
+    }
+    if (rating === 0) {
+      toast({ title: "Please add a rating", variant: "destructive" });
+      return;
+    }
+
+    const extractionYield = calculateEY();
+    
+    addBrew({
+      date: new Date().toISOString(),
+      coffeeBeanId: selectedBeanId,
+      batchId: selectedBatchId,
+      grinderId: selectedGrinderId,
+      brewerId: selectedBrewerId,
+      recipeId: selectedRecipeId,
+      dose: parseFloat(dose),
+      grindSize: parseFloat(grindSize),
+      water: parseFloat(water),
+      yield: parseFloat(yieldAmount),
+      temperature: parseFloat(temperature),
+      brewTime,
+      tds: parseFloat(tds),
+      extractionYield: extractionYield ? parseFloat(extractionYield) : 0,
+      rating,
+      comment,
+      photo,
+    });
+
+    toast({ title: "Brew logged successfully!" });
+    navigate("/");
+  };
+
+  // When recipe is selected, pre-fill brew parameters
+  const handleRecipeSelect = (recipeId: string) => {
+    setSelectedRecipeId(recipeId);
+    const recipe = recipes.find(r => r.id === recipeId);
+    if (recipe) {
+      setDose(recipe.dose.toString());
+      setGrindSize(recipe.grindSize.toString());
+      setWater(recipe.water.toString());
+      setYieldAmount(recipe.yield.toString());
+      setTemperature(recipe.temperature.toString());
+      setBrewTime(recipe.brewTime);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-cream to-background p-4">
+      <div className="max-w-2xl mx-auto">
+        <Button
+          variant="ghost"
+          onClick={handleBack}
+          className="mb-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
+
+        <Card className="border-espresso/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-espresso">
+              <Coffee className="h-6 w-6" />
+              Log New Brew
+            </CardTitle>
+            <CardDescription>Step {step} of 6</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Step 1: Select Coffee Bean & Batch */}
+            {step === 1 && (
+              <div className="space-y-4 animate-fade-in">
+                <div>
+                  <Label htmlFor="bean">Coffee Bean</Label>
+                  <Select value={selectedBeanId} onValueChange={(value) => {
+                    setSelectedBeanId(value);
+                    setSelectedBatchId("");
+                  }}>
+                    <SelectTrigger id="bean">
+                      <SelectValue placeholder="Select coffee bean" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {coffeeBeans.map((bean) => (
+                        <SelectItem key={bean.id} value={bean.id}>
+                          {bean.name} - {bean.roaster}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedBean && selectedBean.batches.length > 0 && (
+                  <div>
+                    <Label htmlFor="batch">Batch</Label>
+                    <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
+                      <SelectTrigger id="batch">
+                        <SelectValue placeholder="Select batch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedBean.batches.map((batch) => (
+                          <SelectItem key={batch.id} value={batch.id}>
+                            Roasted: {new Date(batch.roastDate).toLocaleDateString()} - {batch.weight}g
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {selectedBean && selectedBean.batches.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No batches available. Please add a batch to this coffee bean first.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Step 2: Select Grinder */}
+            {step === 2 && (
+              <div className="space-y-4 animate-fade-in">
+                <div>
+                  <Label htmlFor="grinder">Grinder</Label>
+                  <Select value={selectedGrinderId} onValueChange={setSelectedGrinderId}>
+                    <SelectTrigger id="grinder">
+                      <SelectValue placeholder="Select grinder" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {grinders.map((grinder) => (
+                        <SelectItem key={grinder.id} value={grinder.id}>
+                          {grinder.model} ({grinder.burrType})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {grinders.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No grinders available. Please add a grinder in settings first.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Step 3: Select Brewer */}
+            {step === 3 && (
+              <div className="space-y-4 animate-fade-in">
+                <div>
+                  <Label htmlFor="brewer">Brewer</Label>
+                  <Select value={selectedBrewerId} onValueChange={setSelectedBrewerId}>
+                    <SelectTrigger id="brewer">
+                      <SelectValue placeholder="Select brewer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {brewers.map((brewer) => (
+                        <SelectItem key={brewer.id} value={brewer.id}>
+                          {brewer.model} ({brewer.type})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {brewers.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No brewers available. Please add a brewer in settings first.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Step 4: Select Recipe */}
+            {step === 4 && (
+              <div className="space-y-4 animate-fade-in">
+                <div>
+                  <Label htmlFor="recipe">Recipe</Label>
+                  <Select value={selectedRecipeId} onValueChange={handleRecipeSelect}>
+                    <SelectTrigger id="recipe">
+                      <SelectValue placeholder="Select recipe" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredRecipes.map((recipe) => (
+                        <SelectItem key={recipe.id} value={recipe.id}>
+                          {recipe.name} (Ratio: {recipe.ratio})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {filteredRecipes.length === 0 && (
+                  <p className="text-sm text-muted-foreground">
+                    No recipes available for this grinder and brewer combination. Please add a recipe in settings first.
+                  </p>
+                )}
+                {selectedRecipe && (
+                  <Card className="bg-cream/50">
+                    <CardContent className="pt-6">
+                      <h4 className="font-medium mb-2">Recipe Details</h4>
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>Ratio: {selectedRecipe.ratio}</div>
+                        <div>Dose: {selectedRecipe.dose}g</div>
+                        <div>Grind: {selectedRecipe.grindSize}</div>
+                        <div>Water: {selectedRecipe.water}g</div>
+                        <div>Yield: {selectedRecipe.yield}g</div>
+                        <div>Temp: {selectedRecipe.temperature}°C</div>
+                        <div className="col-span-2">Time: {selectedRecipe.brewTime}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {/* Step 5: Adjust Parameters */}
+            {step === 5 && (
+              <div className="space-y-4 animate-fade-in">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Adjust parameters for this brew (pre-filled from recipe)
+                </p>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="dose" className="flex items-center gap-2">
+                      <Scale className="h-4 w-4" />
+                      Dose (g)
+                    </Label>
+                    <Input
+                      id="dose"
+                      type="number"
+                      step="0.1"
+                      value={dose}
+                      onChange={(e) => setDose(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="grindSize">Grind Size</Label>
+                    <Input
+                      id="grindSize"
+                      type="number"
+                      step="0.1"
+                      value={grindSize}
+                      onChange={(e) => setGrindSize(e.target.value)}
+                      placeholder="e.g., 4.5"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="water" className="flex items-center gap-2">
+                      <Droplets className="h-4 w-4" />
+                      Water (g)
+                    </Label>
+                    <Input
+                      id="water"
+                      type="number"
+                      step="0.1"
+                      value={water}
+                      onChange={(e) => setWater(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="yield">Yield (g)</Label>
+                    <Input
+                      id="yield"
+                      type="number"
+                      step="0.1"
+                      value={yieldAmount}
+                      onChange={(e) => setYieldAmount(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="temperature" className="flex items-center gap-2">
+                      <Thermometer className="h-4 w-4" />
+                      Temperature (°C)
+                    </Label>
+                    <Input
+                      id="temperature"
+                      type="number"
+                      step="0.1"
+                      value={temperature}
+                      onChange={(e) => setTemperature(e.target.value)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="brewTime" className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Brew Time
+                    </Label>
+                    <Input
+                      id="brewTime"
+                      value={brewTime}
+                      onChange={(e) => setBrewTime(e.target.value)}
+                      placeholder="e.g., 2:30"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="photo">Photo URL (optional)</Label>
+                  <Input
+                    id="photo"
+                    value={photo}
+                    onChange={(e) => setPhoto(e.target.value)}
+                    placeholder="Enter photo URL"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Step 6: Post-Brew Analysis */}
+            {step === 6 && (
+              <div className="space-y-4 animate-fade-in">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Record your brew results
+                </p>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="tds">TDS (%)</Label>
+                    <Input
+                      id="tds"
+                      type="number"
+                      step="0.01"
+                      value={tds}
+                      onChange={(e) => setTds(e.target.value)}
+                      placeholder="e.g., 1.35"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Extraction Yield</Label>
+                    <div className="h-10 flex items-center px-3 rounded-md border border-input bg-muted">
+                      {calculateEY() ? `${calculateEY()}%` : "-"}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Rating</Label>
+                  <div className="flex gap-2 mt-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setRating(star)}
+                        className="transition-transform hover:scale-110"
+                      >
+                        <Star
+                          className={`h-8 w-8 ${
+                            star <= rating
+                              ? "fill-golden text-golden"
+                              : "text-muted-foreground"
+                          }`}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="comment">Tasting Notes & Comments</Label>
+                  <Textarea
+                    id="comment"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="How did it taste? Any observations?"
+                    rows={4}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Navigation Buttons */}
+            <div className="flex gap-4 pt-4">
+              {step > 1 && step < 6 && (
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(step - 1)}
+                  className="flex-1"
+                >
+                  Previous
+                </Button>
+              )}
+              {step < 6 && (
+                <Button onClick={handleNext} className="flex-1">
+                  Next
+                </Button>
+              )}
+              {step === 6 && (
+                <Button onClick={handleSaveBrew} className="flex-1">
+                  Save Brew
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
