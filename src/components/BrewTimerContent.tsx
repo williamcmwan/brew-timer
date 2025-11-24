@@ -245,42 +245,44 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
           <p>Ratio: {recipe.ratio} | Dose: {recipe.dose}g | Water: {recipe.water}ml</p>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         {/* Overall Progress */}
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs">
             <span>Overall Progress</span>
             <span>{Math.round(progressPercentage)}%</span>
           </div>
-          <Progress value={progressPercentage} className="h-2" />
+          <Progress value={progressPercentage} className="h-1.5" />
         </div>
 
         {/* Current Step */}
-        <div className="text-center space-y-4 py-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 text-primary text-2xl font-bold">
-            {currentStepIndex + 1}
-          </div>
-          <div>
-            <h3 className="text-2xl font-bold mb-2">{currentStep?.title}</h3>
-            <p className="text-muted-foreground">{currentStep?.description}</p>
+        <div className="space-y-3 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary text-lg font-bold flex-shrink-0">
+              {currentStepIndex + 1}
+            </div>
+            <div className="flex-1 text-left">
+              <h3 className="text-xl font-bold leading-tight">{currentStep?.title}</h3>
+              <p className="text-sm text-muted-foreground leading-tight mt-0.5">{currentStep?.description}</p>
+            </div>
           </div>
           
           {currentStep && currentStep.duration > 0 && (
             <>
-              <div className="text-6xl font-bold tabular-nums">
+              <div className="text-5xl font-bold tabular-nums text-center">
                 {formatTime(timeRemaining)}
               </div>
               {currentStep.waterAmount && currentStep.waterAmount > 100 && (
-                <div className="flex gap-6 justify-center text-sm text-muted-foreground mt-4">
+                <div className="flex gap-4 justify-center text-sm text-muted-foreground">
                   <div className="flex flex-col items-center">
                     <span className="text-xs uppercase tracking-wide">Flow Rate</span>
-                    <span className="text-lg font-semibold text-foreground">
+                    <span className="text-base font-semibold text-foreground">
                       {(currentStep.waterAmount / currentStep.duration).toFixed(1)} g/s
                     </span>
                   </div>
                   <div className="flex flex-col items-center">
                     <span className="text-xs uppercase tracking-wide">Total Water</span>
-                    <span className="text-lg font-semibold text-foreground">
+                    <span className="text-base font-semibold text-foreground">
                       {(() => {
                         // Calculate cumulative water up to previous steps
                         const previousWater = steps.slice(0, currentStepIndex).reduce((sum, s) => 
@@ -341,8 +343,8 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
         </div>
 
         {/* Step List */}
-        <div className="border-t pt-4 space-y-2">
-          <h4 className="font-semibold text-sm text-muted-foreground mb-3">All Steps</h4>
+        <div className="border-t pt-3 space-y-1.5">
+          <h4 className="font-semibold text-xs text-muted-foreground mb-2">All Steps</h4>
           {steps.map((step, index) => {
             // Calculate elapsed time at the end of this step
             const elapsedTime = steps.slice(0, index + 1).reduce((sum, s) => sum + s.duration, 0);
@@ -350,7 +352,7 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
             return (
               <div
                 key={index}
-                className={`flex items-start gap-3 p-3 rounded-lg transition-colors ${
+                className={`flex items-start gap-2 p-2 rounded-lg transition-colors ${
                   index === currentStepIndex
                     ? 'bg-primary/10 border border-primary/20'
                     : index < currentStepIndex
@@ -358,7 +360,7 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
                     : 'bg-muted/20'
                 }`}
               >
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                <div className={`flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold flex-shrink-0 ${
                   index < currentStepIndex ? 'bg-primary text-primary-foreground' :
                   index === currentStepIndex ? 'bg-primary text-primary-foreground' :
                   'bg-muted text-muted-foreground'
@@ -366,8 +368,8 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
                   {index < currentStepIndex ? '✓' : index + 1}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm">{step.title}</div>
-                  <div className="text-xs text-muted-foreground">{step.description}</div>
+                  <div className="font-medium text-sm leading-tight">{step.title}</div>
+                  <div className="text-xs text-muted-foreground leading-tight">{step.description}</div>
                 </div>
                 {(step.duration > 0 || (step.duration === 0 && index === steps.length - 1)) && (
                   <div className="text-xs text-muted-foreground whitespace-nowrap">
