@@ -15,6 +15,7 @@ interface ImageUploadProps {
 export default function ImageUpload({ value, onChange, label = "Photo", className = "" }: ImageUploadProps) {
   const [preview, setPreview] = useState<string>(value || "");
   const [isLoading, setIsLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,6 +58,53 @@ export default function ImageUpload({ value, onChange, label = "Photo", classNam
     onChange("");
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      toast({
+        title: "Invalid image",
+        description: validation.error,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const compressed = await compressImage(file);
+      setPreview(compressed);
+      onChange(compressed);
+      toast({
+        title: "Image uploaded",
+        description: "Your image has been successfully uploaded.",
+      });
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: "Failed to process image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
   };
 
   return (
@@ -106,8 +154,19 @@ export default function ImageUpload({ value, onChange, label = "Photo", classNam
             </Button>
           </div>
           
-          <div className="w-full h-48 rounded-lg border-2 border-dashed border-border flex items-center justify-center bg-muted/20">
-            <p className="text-sm text-muted-foreground">No image selected</p>
+          <div 
+            className={`w-full h-48 rounded-lg border-2 border-dashed flex items-center justify-center transition-colors ${
+              isDragging 
+                ? 'border-primary bg-primary/10' 
+                : 'border-border bg-muted/20'
+            }`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+          >
+            <p className="text-sm text-muted-foreground">
+              {isDragging ? 'Drop image here' : 'Drag & drop or click to upload'}
+            </p>
           </div>
         </div>
       )}
