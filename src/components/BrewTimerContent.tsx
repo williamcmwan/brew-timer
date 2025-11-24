@@ -257,11 +257,11 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
 
         {/* Current Step */}
         <div className="space-y-3 py-4">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 justify-center">
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary text-lg font-bold flex-shrink-0">
               {currentStepIndex + 1}
             </div>
-            <div className="flex-1 text-left">
+            <div className="text-left">
               <h3 className="text-xl font-bold leading-tight">{currentStep?.title}</h3>
               <p className="text-sm text-muted-foreground leading-tight mt-0.5">{currentStep?.description}</p>
             </div>
