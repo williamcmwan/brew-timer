@@ -241,12 +241,23 @@ export function RecipeDialog({ open, onOpenChange, recipe }: RecipeDialogProps) 
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs">Water (g)</Label>
+                      <Label className="text-xs">Cumulative Water (g)</Label>
                       <Input
                         type="number"
                         placeholder="0"
-                        value={step.waterAmount || ""}
-                        onChange={(e) => updateStep(index, "waterAmount", parseFloat(e.target.value) || 0)}
+                        value={(() => {
+                          // Calculate cumulative water up to and including this step
+                          const cumulativeWater = processSteps.slice(0, index + 1).reduce((sum, s) => sum + (s.waterAmount || 0), 0);
+                          return cumulativeWater || "";
+                        })()}
+                        onChange={(e) => {
+                          const cumulativeValue = parseFloat(e.target.value) || 0;
+                          // Calculate water for previous steps
+                          const previousWater = processSteps.slice(0, index).reduce((sum, s) => sum + (s.waterAmount || 0), 0);
+                          // Set this step's water amount
+                          const stepWater = Math.max(0, cumulativeValue - previousWater);
+                          updateStep(index, "waterAmount", stepWater);
+                        }}
                       />
                     </div>
                     <div>
