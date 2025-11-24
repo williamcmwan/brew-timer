@@ -334,14 +334,9 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
                   <div className="font-medium text-sm">{step.title}</div>
                   <div className="text-xs text-muted-foreground">{step.description}</div>
                 </div>
-                {step.duration > 0 && (
+                {(step.duration > 0 || (step.duration === 0 && index === steps.length - 1)) && (
                   <div className="text-xs text-muted-foreground whitespace-nowrap">
-                    until {formatTime(elapsedTime)}
-                  </div>
-                )}
-                {step.duration === 0 && index > 0 && (
-                  <div className="text-xs text-muted-foreground whitespace-nowrap">
-                    {formatTime(0)}
+                    {formatTime(elapsedTime)}
                   </div>
                 )}
               </div>
