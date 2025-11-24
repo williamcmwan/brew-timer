@@ -250,12 +250,26 @@ export function RecipeDialog({ open, onOpenChange, recipe }: RecipeDialogProps) 
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">Duration (s)</Label>
+                      <Label className="text-xs">Elapsed Time (s)</Label>
                       <Input
-                        type="number"
-                        placeholder="30"
-                        value={step.duration || ""}
-                        onChange={(e) => updateStep(index, "duration", parseInt(e.target.value) || 0)}
+                        type="text"
+                        placeholder="30 or 1:30"
+                        value={
+                          step.duration >= 60
+                            ? `${Math.floor(step.duration / 60)}:${(step.duration % 60).toString().padStart(2, '0')}`
+                            : step.duration.toString()
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          let seconds = 0;
+                          if (val.includes(':')) {
+                            const [mins, secs] = val.split(':').map(Number);
+                            seconds = (mins || 0) * 60 + (secs || 0);
+                          } else {
+                            seconds = Number(val) || 0;
+                          }
+                          updateStep(index, "duration", seconds);
+                        }}
                       />
                     </div>
                   </div>
@@ -280,7 +294,7 @@ export function RecipeDialog({ open, onOpenChange, recipe }: RecipeDialogProps) 
               <Input
                 id="grindSize"
                 type="number"
-                step="0.1"
+                step="0.001"
                 {...register("grindSize", { valueAsNumber: true })}
               />
               {errors.grindSize && <p className="text-sm text-destructive">{errors.grindSize.message}</p>}

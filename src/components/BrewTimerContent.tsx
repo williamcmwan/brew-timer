@@ -33,22 +33,36 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
     
     const parsedSteps: TimerStep[] = [];
     
-    // Add initial preparation step
+    // Add initial preparation step (0 seconds)
     parsedSteps.push({
       title: "Preparation",
-      duration: 30,
+      duration: 0,
       description: `Heat water to ${recipe.temperature}°C. Prepare ${recipe.dose}g of coffee ground at setting ${recipe.grindSize}.`
     });
     
-    // Use structured process steps if available
+    // Use structured process steps if available (elapsed times)
     if (recipe.processSteps && recipe.processSteps.length > 0) {
+      let previousElapsed = 0;
       recipe.processSteps.forEach((step, index) => {
+        const stepDuration = step.duration - previousElapsed;
         parsedSteps.push({
           title: step.description || `Step ${index + 1}`,
-          duration: step.duration,
-          description: `Pour ${step.waterAmount}g of water.`
+          duration: stepDuration,
+          description: `Pour ${step.waterAmount}g of water (at ${step.duration}s).`
         });
+        previousElapsed = step.duration;
       });
+      
+      // Add drawdown step using brew time
+      const brewTime = Number(recipe.brewTime) || 180;
+      const drawdownDuration = brewTime - previousElapsed;
+      if (drawdownDuration > 0) {
+        parsedSteps.push({
+          title: "Drawdown",
+          duration: drawdownDuration,
+          description: `Wait for complete drawdown. Target yield: ${recipe.yield}ml.`
+        });
+      }
     } else {
       // Fallback to old process parsing or default steps
       const brewTime = Number(recipe.brewTime) || 180;
