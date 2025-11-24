@@ -33,7 +33,23 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
     
     const parsedSteps: TimerStep[] = [];
     
-    // Add initial preparation step (0 seconds)
+    // Helper to parse brew time (mm:ss or seconds)
+    const parseBrewTime = (time: string): number => {
+      if (time.includes(':')) {
+        const [mins, secs] = time.split(':').map(Number);
+        return (mins || 0) * 60 + (secs || 0);
+      }
+      return Number(time) || 180;
+    };
+    
+    // Helper to format seconds to mm:ss
+    const formatElapsed = (seconds: number): string => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+    
+    // Add initial preparation step (0 seconds - starts immediately)
     parsedSteps.push({
       title: "Preparation",
       duration: 0,
@@ -48,14 +64,14 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
         parsedSteps.push({
           title: step.description || `Step ${index + 1}`,
           duration: stepDuration,
-          description: `Pour ${step.waterAmount}g of water (at ${step.duration}s).`
+          description: `Pour ${step.waterAmount}g of water at ${formatElapsed(step.duration)}.`
         });
         previousElapsed = step.duration;
       });
       
       // Add drawdown step using brew time
-      const brewTime = Number(recipe.brewTime) || 180;
-      const drawdownDuration = brewTime - previousElapsed;
+      const brewTimeSeconds = parseBrewTime(recipe.brewTime);
+      const drawdownDuration = brewTimeSeconds - previousElapsed;
       if (drawdownDuration > 0) {
         parsedSteps.push({
           title: "Drawdown",
@@ -65,7 +81,7 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
       }
     } else {
       // Fallback to old process parsing or default steps
-      const brewTime = Number(recipe.brewTime) || 180;
+      const brewTimeSeconds = parseBrewTime(recipe.brewTime);
       const water = Number(recipe.water) || 0;
       
       if (recipe.process) {
@@ -73,13 +89,13 @@ export default function BrewTimerContent({ recipe, onClose, onComplete }: BrewTi
         lines.forEach((line, index) => {
           parsedSteps.push({
             title: `Step ${index + 1}`,
-            duration: Math.floor(brewTime / lines.length),
+            duration: Math.floor(brewTimeSeconds / lines.length),
             description: line.trim()
           });
         });
       } else {
         // Default brewing steps based on brew time
-        const stepDuration = Math.floor(brewTime / 3);
+        const stepDuration = Math.floor(brewTimeSeconds / 3);
         parsedSteps.push({
           title: "Bloom",
           duration: stepDuration,
