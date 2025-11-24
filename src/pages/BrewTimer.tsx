@@ -35,44 +35,85 @@ export default function BrewTimer() {
     
     const parsedSteps: TimerStep[] = [];
     
-    // Add initial preparation step
+    // Helper to parse brew time (mm:ss or seconds)
+    const parseBrewTime = (time: string): number => {
+      if (time.includes(':')) {
+        const [mins, secs] = time.split(':').map(Number);
+        return (mins || 0) * 60 + (secs || 0);
+      }
+      return Number(time) || 180;
+    };
+    
+    // Helper to format seconds to mm:ss
+    const formatElapsed = (seconds: number): string => {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+    
+    // Add initial preparation step (0 seconds - starts immediately)
     parsedSteps.push({
       title: "Preparation",
-      duration: 30,
+      duration: 0,
       description: `Heat water to ${recipe.temperature}°C. Prepare ${recipe.dose}g of coffee ground at setting ${recipe.grindSize}.`
     });
     
-    // Parse process steps or create default brewing steps
-    const brewTime = Number(recipe.brewTime) || 180;
-    const water = Number(recipe.water) || 0;
-    
-    if (recipe.process) {
-      const lines = recipe.process.split('\n').filter(line => line.trim());
-      lines.forEach((line, index) => {
+    // Use structured process steps if available (elapsed times)
+    if (recipe.processSteps && recipe.processSteps.length > 0) {
+      let previousElapsed = 0;
+      recipe.processSteps.forEach((step, index) => {
+        const stepDuration = step.duration - previousElapsed;
         parsedSteps.push({
-          title: `Step ${index + 1}`,
-          duration: Math.floor(brewTime / lines.length),
-          description: line.trim()
+          title: step.description || `Step ${index + 1}`,
+          duration: stepDuration,
+          description: `Pour ${step.waterAmount}g of water at ${formatElapsed(step.duration)}.`
         });
+        previousElapsed = step.duration;
       });
+      
+      // Add drawdown step using brew time
+      const brewTimeSeconds = parseBrewTime(recipe.brewTime);
+      const drawdownDuration = brewTimeSeconds - previousElapsed;
+      if (drawdownDuration > 0) {
+        parsedSteps.push({
+          title: "Drawdown",
+          duration: drawdownDuration,
+          description: `Wait for complete drawdown. Target yield: ${recipe.yield}ml.`
+        });
+      }
     } else {
-      // Default brewing steps based on brew time
-      const stepDuration = Math.floor(brewTime / 3);
-      parsedSteps.push({
-        title: "Bloom",
-        duration: stepDuration,
-        description: `Pour ${Math.floor(water * 0.3)}ml of water and let bloom.`
-      });
-      parsedSteps.push({
-        title: "Main Pour",
-        duration: stepDuration,
-        description: `Pour remaining water in circular motions to reach ${recipe.water}ml total.`
-      });
-      parsedSteps.push({
-        title: "Drawdown",
-        duration: stepDuration,
-        description: `Wait for complete drawdown. Target yield: ${recipe.yield}ml.`
-      });
+      // Fallback to old process parsing or default steps
+      const brewTimeSeconds = parseBrewTime(recipe.brewTime);
+      const water = Number(recipe.water) || 0;
+      
+      if (recipe.process) {
+        const lines = recipe.process.split('\n').filter(line => line.trim());
+        lines.forEach((line, index) => {
+          parsedSteps.push({
+            title: `Step ${index + 1}`,
+            duration: Math.floor(brewTimeSeconds / lines.length),
+            description: line.trim()
+          });
+        });
+      } else {
+        // Default brewing steps based on brew time
+        const stepDuration = Math.floor(brewTimeSeconds / 3);
+        parsedSteps.push({
+          title: "Bloom",
+          duration: stepDuration,
+          description: `Pour ${Math.floor(water * 0.3)}ml of water and let bloom.`
+        });
+        parsedSteps.push({
+          title: "Main Pour",
+          duration: stepDuration,
+          description: `Pour remaining water in circular motions to reach ${recipe.water}ml total.`
+        });
+        parsedSteps.push({
+          title: "Drawdown",
+          duration: stepDuration,
+          description: `Wait for complete drawdown. Target yield: ${recipe.yield}ml.`
+        });
+      }
     }
     
     // Add final step
@@ -292,35 +333,40 @@ export default function BrewTimer() {
           {/* Step List */}
           <div className="border-t pt-4 space-y-2">
             <h4 className="font-semibold text-sm text-muted-foreground mb-3">All Steps</h4>
-            {steps.map((step, index) => (
-              <div
-                key={index}
-                className={`flex items-start gap-3 p-3 rounded-lg transition-colors ${
-                  index === currentStepIndex
-                    ? 'bg-primary/10 border border-primary/20'
-                    : index < currentStepIndex
-                    ? 'bg-muted/50 opacity-60'
-                    : 'bg-muted/20'
-                }`}
-              >
-                <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                  index < currentStepIndex ? 'bg-primary text-primary-foreground' :
-                  index === currentStepIndex ? 'bg-primary text-primary-foreground' :
-                  'bg-muted text-muted-foreground'
-                }`}>
-                  {index < currentStepIndex ? '✓' : index + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm">{step.title}</div>
-                  <div className="text-xs text-muted-foreground">{step.description}</div>
-                </div>
-                {step.duration > 0 && (
-                  <div className="text-xs text-muted-foreground whitespace-nowrap">
-                    {formatTime(step.duration)}
+            {steps.map((step, index) => {
+              // Calculate elapsed time at the end of this step
+              const elapsedTime = steps.slice(0, index + 1).reduce((sum, s) => sum + s.duration, 0);
+              
+              return (
+                <div
+                  key={index}
+                  className={`flex items-start gap-3 p-3 rounded-lg transition-colors ${
+                    index === currentStepIndex
+                      ? 'bg-primary/10 border border-primary/20'
+                      : index < currentStepIndex
+                      ? 'bg-muted/50 opacity-60'
+                      : 'bg-muted/20'
+                  }`}
+                >
+                  <div className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                    index < currentStepIndex ? 'bg-primary text-primary-foreground' :
+                    index === currentStepIndex ? 'bg-primary text-primary-foreground' :
+                    'bg-muted text-muted-foreground'
+                  }`}>
+                    {index < currentStepIndex ? '✓' : index + 1}
                   </div>
-                )}
-              </div>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm">{step.title}</div>
+                    <div className="text-xs text-muted-foreground">{step.description}</div>
+                  </div>
+                  {(step.duration > 0 || (step.duration === 0 && index === steps.length - 1)) && (
+                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                      {formatTime(elapsedTime)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
