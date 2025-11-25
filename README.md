@@ -1,73 +1,86 @@
-# Welcome to your Lovable project
+# Brew Journal
 
-## Project info
+A coffee brewing journal application to track your brews, recipes, equipment, and coffee beans.
 
-**URL**: https://lovable.dev/projects/3d2f916f-a700-47ff-89d9-9250700dad4d
+## Project Structure
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/3d2f916f-a700-47ff-89d9-9250700dad4d) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```
+├── client/          # React frontend (Vite + TypeScript)
+├── server/          # Express backend with SQLite
+├── scripts/         # Deployment and control scripts
+│   ├── deploy.sh    # Build and deploy the application
+│   └── app.sh       # Start/stop/restart the application
 ```
 
-**Edit a file directly in GitHub**
+## Quick Start
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Prerequisites
 
-**Use GitHub Codespaces**
+- Node.js 18+
+- npm
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Deployment
 
-## What technologies are used for this project?
+```bash
+# Build everything
+./scripts/deploy.sh
 
-This project is built with:
+# Start the application
+./scripts/app.sh start
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+The application will be available at http://localhost:3003
 
-## How can I deploy this project?
+### Application Control
 
-Simply open [Lovable](https://lovable.dev/projects/3d2f916f-a700-47ff-89d9-9250700dad4d) and click on Share -> Publish.
+```bash
+# Start the server
+./scripts/app.sh start
 
-## Can I connect a custom domain to my Lovable project?
+# Stop the server
+./scripts/app.sh stop
 
-Yes, you can!
+# Restart the server
+./scripts/app.sh restart
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+# Check status
+./scripts/app.sh status
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+# View logs
+./scripts/app.sh logs
+```
+
+### Development
+
+For development, run the client and server separately:
+
+```bash
+# Terminal 1: Start the server (with hot reload)
+cd server && npm run dev
+
+# Terminal 2: Start the client (with hot reload)
+cd client && npm run dev
+```
+
+The client dev server runs on port 5173 and proxies API requests to the server on port 3003.
+
+## Features
+
+- **Brew Tracking**: Log brews with detailed parameters (dose, grind, water, temperature, time)
+- **Coffee Beans**: Manage beans with batches, track remaining weight, filter by roast type (espresso/pour-over)
+- **Recipes**: Create and save recipes with process steps for guided brewing
+- **Equipment**: Track grinders and brewers
+- **Brew History**: View, edit, and delete past brews with filtering and sorting
+- **Analytics**: View brewing statistics and trends
+- **Brew Comparison**: Compare multiple brews side by side
+- **Brew Timer**: Timer with recipe steps for guided brewing
+- **Custom Templates**: Create custom brew note templates for consistent observations
+- **Inventory Management**: Track coffee stock with low stock alerts
+- **Export**: Export brew history to CSV or PDF
+- **Share**: Share brew details via native share or clipboard
+
+## Tech Stack
+
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS, shadcn/ui
+- **Backend**: Express, TypeScript, better-sqlite3
+- **Database**: SQLite
