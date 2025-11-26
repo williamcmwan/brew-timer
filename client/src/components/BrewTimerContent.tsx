@@ -72,11 +72,12 @@ export default function BrewTimerContent({
       let previousElapsed = 0;
       recipe.processSteps.forEach((step, index) => {
         const stepDuration = step.duration - previousElapsed;
+        const hasWater = step.waterAmount && step.waterAmount > 0;
         parsedSteps.push({
           title: step.description || `Step ${index + 1}`,
           duration: stepDuration,
-          description: `Pour ${step.waterAmount}g of water.`,
-          waterAmount: step.waterAmount
+          description: hasWater ? `Pour ${step.waterAmount}g of water.` : step.description || `Step ${index + 1}`,
+          waterAmount: hasWater ? step.waterAmount : undefined
         });
         previousElapsed = step.duration;
       });
@@ -279,20 +280,20 @@ export default function BrewTimerContent({
           
           {currentStep && currentStep.duration > 0 && (
             <>
-              <div className="text-5xl font-bold tabular-nums text-center">
+              <div className="text-7xl font-bold tabular-nums text-center">
                 {formatTime(timeRemaining)}
               </div>
-              {currentStep.waterAmount && currentStep.waterAmount > 100 && (
-                <div className="flex gap-4 justify-center text-sm text-muted-foreground">
+              {currentStep.waterAmount && currentStep.waterAmount > 0 && (
+                <div className="flex gap-8 justify-center text-muted-foreground mt-2">
                   <div className="flex flex-col items-center">
-                    <span className="text-xs uppercase tracking-wide">Flow Rate</span>
-                    <span className="text-base font-semibold text-foreground">
+                    <span className="text-sm uppercase tracking-wide">Flow Rate</span>
+                    <span className="text-2xl font-semibold text-foreground">
                       {(currentStep.waterAmount / currentStep.duration).toFixed(1)} g/s
                     </span>
                   </div>
                   <div className="flex flex-col items-center">
-                    <span className="text-xs uppercase tracking-wide">Total Water</span>
-                    <span className="text-base font-semibold text-foreground">
+                    <span className="text-sm uppercase tracking-wide">Total Water</span>
+                    <span className="text-2xl font-semibold text-foreground">
                       {(() => {
                         // Calculate cumulative water up to previous steps
                         const previousWater = steps.slice(0, currentStepIndex).reduce((sum, s) => 
@@ -352,43 +353,53 @@ export default function BrewTimerContent({
           )}
         </div>
 
-        {/* Step List */}
-        <div className="border-t pt-3 space-y-1.5">
-          <h4 className="font-semibold text-xs text-muted-foreground mb-2">All Steps</h4>
-          {steps.map((step, index) => {
-            // Calculate elapsed time at the end of this step
-            const elapsedTime = steps.slice(0, index + 1).reduce((sum, s) => sum + s.duration, 0);
-            
-            return (
-              <div
-                key={index}
-                className={`flex items-start gap-2 p-2 rounded-lg transition-colors ${
-                  index === currentStepIndex
-                    ? 'bg-primary/10 border border-primary/20'
-                    : index < currentStepIndex
-                    ? 'bg-muted/50 opacity-60'
-                    : 'bg-muted/20'
-                }`}
-              >
-                <div className={`flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold flex-shrink-0 ${
-                  index < currentStepIndex ? 'bg-primary text-primary-foreground' :
-                  index === currentStepIndex ? 'bg-primary text-primary-foreground' :
-                  'bg-muted text-muted-foreground'
-                }`}>
-                  {index < currentStepIndex ? '✓' : index + 1}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm leading-tight">{step.title}</div>
-                  <div className="text-xs text-muted-foreground leading-tight">{step.description}</div>
-                </div>
-                {(step.duration > 0 || (step.duration === 0 && index === steps.length - 1)) && (
-                  <div className="text-xs text-muted-foreground whitespace-nowrap">
-                    {formatTime(elapsedTime)}
+        {/* Timeline */}
+        <div className="border-t pt-3">
+          <h4 className="font-semibold text-xs text-muted-foreground mb-3">Timeline</h4>
+          <div className="relative">
+            {steps.map((step, index) => {
+              // Calculate elapsed time at the start of this step
+              const stepStartTime = steps.slice(0, index).reduce((sum, s) => sum + s.duration, 0);
+              const isLast = index === steps.length - 1;
+              
+              return (
+                <div key={index} className="flex gap-3">
+                  {/* Timeline column */}
+                  <div className="flex flex-col items-center">
+                    {/* Time marker */}
+                    <div className={`text-xs font-mono w-10 text-right ${
+                      index <= currentStepIndex ? 'text-primary font-semibold' : 'text-muted-foreground'
+                    }`}>
+                      {formatTime(stepStartTime)}
+                    </div>
+                    {/* Dot */}
+                    <div className={`w-3 h-3 rounded-full mt-1 ${
+                      index < currentStepIndex ? 'bg-primary' :
+                      index === currentStepIndex ? 'bg-primary ring-4 ring-primary/20' :
+                      'bg-muted-foreground/30'
+                    }`} />
+                    {/* Line */}
+                    {!isLast && (
+                      <div className={`w-0.5 flex-1 min-h-8 ${
+                        index < currentStepIndex ? 'bg-primary' : 'bg-muted-foreground/20'
+                      }`} />
+                    )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                  {/* Content */}
+                  <div className={`flex-1 pb-4 ${index < currentStepIndex ? 'opacity-60' : ''}`}>
+                    <div className={`font-medium text-sm ${
+                      index === currentStepIndex ? 'text-primary' : ''
+                    }`}>
+                      {step.title}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {step.description}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Close Button */}
