@@ -34,9 +34,10 @@ interface RecipeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   recipe: Recipe | null;
+  isCloning?: boolean;
 }
 
-export function RecipeDialog({ open, onOpenChange, recipe }: RecipeDialogProps) {
+export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: RecipeDialogProps) {
   const { addRecipe, updateRecipe, grinders, brewers } = useApp();
   const { toast } = useToast();
   const [processSteps, setProcessSteps] = useState<RecipeStep[]>([
@@ -75,16 +76,20 @@ export function RecipeDialog({ open, onOpenChange, recipe }: RecipeDialogProps) 
   useEffect(() => {
     if (recipe) {
       Object.entries(recipe).forEach(([key, value]) => {
-        setValue(key as any, value);
+        if (key === 'name' && isCloning) {
+          setValue('name', `${value} (Copy)`);
+        } else if (key !== 'id') {
+          setValue(key as any, value);
+        }
       });
       if (recipe.processSteps && recipe.processSteps.length > 0) {
-        setProcessSteps(recipe.processSteps);
+        setProcessSteps([...recipe.processSteps]);
       }
     } else {
       reset();
       setProcessSteps([{ description: "", waterAmount: 0, duration: 30 }]);
     }
-  }, [recipe, setValue, reset]);
+  }, [recipe, isCloning, setValue, reset]);
 
   const onSubmit = async (data: RecipeFormData) => {
     if (grinders.length === 0) {
@@ -102,12 +107,12 @@ export function RecipeDialog({ open, onOpenChange, recipe }: RecipeDialogProps) 
     };
 
     try {
-      if (recipe) {
+      if (recipe && !isCloning) {
         await updateRecipe(recipe.id, recipeData);
         toast({ title: "Recipe updated", description: "Recipe has been updated successfully" });
       } else {
         await addRecipe(recipeData as Omit<Recipe, "id">);
-        toast({ title: "Recipe added", description: "Recipe has been added successfully" });
+        toast({ title: isCloning ? "Recipe cloned" : "Recipe added", description: isCloning ? "Recipe has been cloned successfully" : "Recipe has been added successfully" });
       }
       onOpenChange(false);
       reset();
@@ -160,7 +165,7 @@ export function RecipeDialog({ open, onOpenChange, recipe }: RecipeDialogProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{recipe ? "Edit Recipe" : "Add Recipe"}</DialogTitle>
+          <DialogTitle>{isCloning ? "Clone Recipe" : recipe ? "Edit Recipe" : "Add Recipe"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
@@ -380,7 +385,7 @@ export function RecipeDialog({ open, onOpenChange, recipe }: RecipeDialogProps) 
               Cancel
             </Button>
             <Button type="submit" className="flex-1">
-              {recipe ? "Update" : "Add"}
+              {isCloning ? "Clone" : recipe ? "Update" : "Add"}
             </Button>
           </div>
         </form>

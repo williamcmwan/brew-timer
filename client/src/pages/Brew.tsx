@@ -470,20 +470,90 @@ export default function Brew() {
 
                 {selectedRecipe?.processSteps && selectedRecipe.processSteps.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Process Steps</Label>
-                    <div className="space-y-2">
-                      {selectedRecipe.processSteps.map((step, index) => (
-                     <div className="p-2 rounded-md bg-muted/50 text-sm">
-                          <div className="font-medium">{step.description}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {step.waterAmount}g water at {
-                              step.duration >= 60
-                                ? `${Math.floor(step.duration / 60)}:${(step.duration % 60).toString().padStart(2, '0')}`
-                                : `0:${step.duration.toString().padStart(2, '0')}`
-                            } elapsed
-                          </div>
-                        </div>
-                      ))}
+                    <Label>Timeline</Label>
+                    <div className="relative">
+                      {(() => {
+                        const formatTime = (seconds: number) => {
+                          const mins = Math.floor(seconds / 60);
+                          const secs = seconds % 60;
+                          return `${mins}:${secs.toString().padStart(2, '0')}`;
+                        };
+                        
+                        // Build full timeline: Preparation + process steps + Drawdown + Complete
+                        const timelineSteps: { title: string; description: string; startTime: number }[] = [];
+                        
+                        // Preparation step at 0:00
+                        timelineSteps.push({
+                          title: "Preparation",
+                          description: `Heat water to ${selectedRecipe.temperature}°C. Prepare ${selectedRecipe.dose}g of coffee.`,
+                          startTime: 0
+                        });
+                        
+                        // Process steps
+                        let previousDuration = 0;
+                        selectedRecipe.processSteps.forEach((processStep) => {
+                          const hasWater = processStep.waterAmount && processStep.waterAmount > 0;
+                          timelineSteps.push({
+                            title: processStep.description,
+                            description: hasWater ? `Pour ${processStep.waterAmount}g of water.` : processStep.description,
+                            startTime: previousDuration
+                          });
+                          previousDuration = processStep.duration;
+                        });
+                        
+                        // Drawdown step
+                        const parseBrewTime = (time: string): number => {
+                          if (time.includes(':')) {
+                            const [mins, secs] = time.split(':').map(Number);
+                            return (mins || 0) * 60 + (secs || 0);
+                          }
+                          return Number(time) || 180;
+                        };
+                        const brewTimeSeconds = parseBrewTime(selectedRecipe.brewTime);
+                        if (brewTimeSeconds > previousDuration) {
+                          timelineSteps.push({
+                            title: "Drawdown",
+                            description: `Wait for complete drawdown. Target yield: ${selectedRecipe.yield}ml.`,
+                            startTime: previousDuration
+                          });
+                        }
+                        
+                        // Complete step
+                        timelineSteps.push({
+                          title: "Complete",
+                          description: "Brewing complete! Enjoy your coffee.",
+                          startTime: brewTimeSeconds
+                        });
+                        
+                        return timelineSteps.map((step, index) => {
+                          const isLast = index === timelineSteps.length - 1;
+                          
+                          return (
+                            <div key={index} className="flex gap-3">
+                              {/* Timeline column */}
+                              <div className="flex flex-col items-center">
+                                {/* Time marker */}
+                                <div className="text-xs font-mono w-10 text-right text-muted-foreground">
+                                  {formatTime(step.startTime)}
+                                </div>
+                                {/* Dot */}
+                                <div className="w-3 h-3 rounded-full mt-1 bg-muted-foreground/30" />
+                                {/* Line */}
+                                {!isLast && (
+                                  <div className="w-0.5 flex-1 min-h-8 bg-muted-foreground/20" />
+                                )}
+                              </div>
+                              {/* Content */}
+                              <div className="flex-1 pb-4">
+                                <div className="font-medium text-sm">{step.title}</div>
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {step.description}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   </div>
                 )}

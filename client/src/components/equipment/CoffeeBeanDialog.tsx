@@ -35,9 +35,10 @@ interface CoffeeBeanDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   bean: CoffeeBean | null;
+  isCloning?: boolean;
 }
 
-export function CoffeeBeanDialog({ open, onOpenChange, bean }: CoffeeBeanDialogProps) {
+export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }: CoffeeBeanDialogProps) {
   const { addCoffeeBean, updateCoffeeBean } = useApp();
   const { toast } = useToast();
   const [batches, setBatches] = useState<CoffeeBatch[]>([]);
@@ -71,7 +72,7 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean }: CoffeeBeanDialogP
 
   useEffect(() => {
     if (bean) {
-      setValue("name", bean.name);
+      setValue("name", isCloning ? `${bean.name} (Copy)` : bean.name);
       setValue("roaster", bean.roaster);
       setValue("country", bean.country);
       setValue("region", bean.region || "");
@@ -83,12 +84,13 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean }: CoffeeBeanDialogP
       setValue("tastingNotes", bean.tastingNotes || "");
       setValue("url", bean.url || "");
       setValue("photo", bean.photo || "");
-      setBatches(bean.batches || []);
+      // Don't copy batches when cloning - start fresh
+      setBatches(isCloning ? [] : (bean.batches || []));
     } else {
       reset();
       setBatches([]);
     }
-  }, [bean, setValue, reset]);
+  }, [bean, isCloning, setValue, reset]);
 
   const addBatch = () => {
     const today = new Date().toISOString().split("T")[0];
@@ -119,12 +121,12 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean }: CoffeeBeanDialogP
     const beanData = { ...data, batches } as Omit<CoffeeBean, "id">;
 
     try {
-      if (bean) {
+      if (bean && !isCloning) {
         await updateCoffeeBean(bean.id, beanData);
         toast({ title: "Coffee bean updated", description: "Coffee bean has been updated successfully" });
       } else {
         await addCoffeeBean(beanData);
-        toast({ title: "Coffee bean added", description: "Coffee bean has been added successfully" });
+        toast({ title: isCloning ? "Coffee bean cloned" : "Coffee bean added", description: isCloning ? "Coffee bean has been cloned successfully" : "Coffee bean has been added successfully" });
       }
       onOpenChange(false);
       reset();
@@ -142,7 +144,7 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean }: CoffeeBeanDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{bean ? "Edit Coffee Bean" : "Add Coffee Bean"}</DialogTitle>
+          <DialogTitle>{isCloning ? "Clone Coffee Bean" : bean ? "Edit Coffee Bean" : "Add Coffee Bean"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
@@ -310,7 +312,7 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean }: CoffeeBeanDialogP
               Cancel
             </Button>
             <Button type="submit" className="flex-1">
-              {bean ? "Update" : "Add"}
+              {isCloning ? "Clone" : bean ? "Update" : "Add"}
             </Button>
           </div>
         </form>

@@ -4,7 +4,7 @@ import { useApp } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Pencil, Trash2, Bean, Star, Filter } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, Bean, Star, Filter, Copy } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CoffeeBeanDialog } from "@/components/equipment/CoffeeBeanDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -26,16 +26,25 @@ export default function CoffeeBeans() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBean, setEditingBean] = useState<CoffeeBean | null>(null);
+  const [isCloning, setIsCloning] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
 
   const handleEdit = (bean: CoffeeBean) => {
     setEditingBean(bean);
+    setIsCloning(false);
+    setDialogOpen(true);
+  };
+
+  const handleClone = (bean: CoffeeBean) => {
+    setEditingBean(bean);
+    setIsCloning(true);
     setDialogOpen(true);
   };
 
   const handleAdd = () => {
     setEditingBean(null);
+    setIsCloning(false);
     setDialogOpen(true);
   };
 
@@ -120,7 +129,7 @@ export default function CoffeeBeans() {
                           <h3 className="font-semibold text-lg truncate">{bean.name}</h3>
                           <p className="text-sm text-muted-foreground">{bean.roaster}</p>
                         </div>
-                        <div className="flex -space-x-1 shrink-0">
+                        <div className="flex -mr-2 shrink-0">
                           <Button 
                             variant="ghost" 
                             size="icon"
@@ -128,6 +137,9 @@ export default function CoffeeBeans() {
                             onClick={() => toggleCoffeeBeanFavorite(bean.id)}
                           >
                             <Star className={`h-4 w-4 ${bean.favorite ? "fill-golden text-golden" : ""}`} />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleClone(bean)} title="Clone bean">
+                            <Copy className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(bean)}>
                             <Pencil className="h-4 w-4" />
@@ -180,6 +192,7 @@ export default function CoffeeBeans() {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           bean={editingBean}
+          isCloning={isCloning}
         />
 
         <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

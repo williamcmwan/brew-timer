@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Timer, Star, Filter } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Timer, Star, Filter, Copy } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RecipeDialog } from "@/components/equipment/RecipeDialog";
 import { ShareButton } from "@/components/ShareButton";
@@ -27,6 +27,7 @@ export default function Recipes() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+  const [isCloning, setIsCloning] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
 
@@ -35,11 +36,19 @@ export default function Recipes() {
 
   const handleEdit = (recipe: Recipe) => {
     setEditingRecipe(recipe);
+    setIsCloning(false);
+    setDialogOpen(true);
+  };
+
+  const handleClone = (recipe: Recipe) => {
+    setEditingRecipe(recipe);
+    setIsCloning(true);
     setDialogOpen(true);
   };
 
   const handleAdd = () => {
     setEditingRecipe(null);
+    setIsCloning(false);
     setDialogOpen(true);
   };
 
@@ -116,20 +125,25 @@ export default function Recipes() {
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
                         <h3 className="font-semibold text-lg">{recipe.name}</h3>
-                        <div className="flex gap-1 flex-shrink-0">
+                        <div className="flex -mr-2 flex-shrink-0">
                           <Button 
                             variant="ghost" 
-                            size="icon" 
+                            size="icon"
+                            className="h-8 w-8"
                             onClick={() => toggleRecipeFavorite(recipe.id)}
                           >
                             <Star className={`h-4 w-4 ${recipe.favorite ? "fill-golden text-golden" : ""}`} />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(recipe)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleClone(recipe)} title="Clone recipe">
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEdit(recipe)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8"
                             onClick={() => setDeleteId(recipe.id)}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
@@ -174,6 +188,7 @@ export default function Recipes() {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
           recipe={editingRecipe}
+          isCloning={isCloning}
         />
 
         <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
