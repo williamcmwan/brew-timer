@@ -5,11 +5,12 @@ A coffee brewing journal application to track your brews, recipes, equipment, an
 ## Project Structure
 
 ```
-├── client/          # React frontend (Vite + TypeScript)
-├── server/          # Express backend with SQLite
-├── scripts/         # Deployment and control scripts
-│   ├── deploy.sh    # Build and deploy the application
-│   └── app.sh       # Start/stop/restart the application
+├── client/             # React frontend (Vite + TypeScript)
+├── server/             # Express backend with SQLite
+├── scripts/            # Utility scripts
+│   ├── deploy.sh       # Build and deploy the application
+│   ├── app.sh          # Start/stop/restart the application
+│   └── commit-push.sh  # Git commit and push helper
 ```
 
 ## Quick Start
@@ -48,6 +49,13 @@ The application will be available at http://localhost:3003
 
 # View logs
 ./scripts/app.sh logs
+```
+
+### Git Workflow
+
+```bash
+# Commit and push changes
+./scripts/commit-push.sh
 ```
 
 ### Development
