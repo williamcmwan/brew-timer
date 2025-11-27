@@ -77,7 +77,8 @@ The client dev server runs on port 5173 and proxies API requests to the server o
 - **Brew Tracking**: Log brews with detailed parameters (dose, grind, water, temperature, time)
 - **Coffee Beans**: Manage beans with batches, track remaining weight, filter by roast type (espresso/pour-over)
 - **Recipes**: Create and save recipes with process steps for guided brewing
-- **Equipment**: Track grinders and brewers
+- **Equipment**: Track grinders, brewers, and coffee servers
+- **Coffee Servers**: Manage servers with empty weight for automatic yield calculation
 - **Brew History**: View, edit, and delete past brews with filtering and sorting
 - **Analytics**: View brewing statistics and trends
 - **Brew Comparison**: Compare multiple brews side by side

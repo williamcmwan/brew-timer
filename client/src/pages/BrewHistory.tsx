@@ -38,7 +38,7 @@ import {
 export default function BrewHistory() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { brews, coffeeBeans, grinders, brewers, recipes, toggleBrewFavorite, deleteBrew, brewTemplates } = useApp();
+  const { brews, coffeeBeans, grinders, brewers, recipes, toggleBrewFavorite, deleteBrew, brewTemplates, coffeeServers } = useApp();
   
   const [filterBean, setFilterBean] = useState<string>("all");
   const [filterRating, setFilterRating] = useState<string>("all");
@@ -86,6 +86,12 @@ export default function BrewHistory() {
   const getRecipeName = (recipeId: string) => {
     const recipe = recipes.find(r => r.id === recipeId);
     return recipe ? recipe.name : "Unknown";
+  };
+
+  const getServerName = (serverId: string | undefined) => {
+    if (!serverId) return null;
+    const server = coffeeServers.find(s => s.id === serverId);
+    return server ? server.model : null;
   };
 
   // Filter and sort brews
@@ -439,6 +445,12 @@ export default function BrewHistory() {
                                     <span className="text-muted-foreground">Recipe:</span>{" "}
                                     <span className="font-medium">{getRecipeName(brew.recipeId)}</span>
                                   </div>
+                                  {getServerName(brew.coffeeServerId) && (
+                                    <div>
+                                      <span className="text-muted-foreground">Server:</span>{" "}
+                                      <span className="font-medium">{getServerName(brew.coffeeServerId)}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 

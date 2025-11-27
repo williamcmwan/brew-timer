@@ -135,5 +135,22 @@ export function initializeDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+
+    CREATE TABLE IF NOT EXISTS coffee_servers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      model TEXT NOT NULL,
+      photo TEXT,
+      max_volume REAL,
+      empty_weight REAL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
+
+  // Add coffee_server_id column to brews if it doesn't exist
+  const brewsColumns = db.prepare("PRAGMA table_info(brews)").all() as any[];
+  if (!brewsColumns.some((col: any) => col.name === 'coffee_server_id')) {
+    db.exec(`ALTER TABLE brews ADD COLUMN coffee_server_id INTEGER REFERENCES coffee_servers(id)`);
+  }
 }

@@ -12,12 +12,13 @@ import coffeeBeansRoutes from './routes/coffeeBeans.js';
 import brewsRoutes from './routes/brews.js';
 import brewTemplatesRoutes from './routes/brewTemplates.js';
 import uploadsRoutes from './routes/uploads.js';
+import coffeeServersRoutes from './routes/coffeeServers.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3003;
 
-// Ensure data directory exists
-const dataDir = path.join(__dirname, '../data');
+// Data directory - use process.cwd() which is the server directory
+const dataDir = path.join(process.cwd(), 'data');
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
@@ -27,6 +28,7 @@ const uploadsDir = path.join(dataDir, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+console.log('Uploads directory:', uploadsDir);
 
 // Initialize database
 initializeDatabase();
@@ -45,6 +47,7 @@ app.use('/api/coffee-beans', coffeeBeansRoutes);
 app.use('/api/brews', brewsRoutes);
 app.use('/api/brew-templates', brewTemplatesRoutes);
 app.use('/api/uploads', uploadsRoutes);
+app.use('/api/coffee-servers', coffeeServersRoutes);
 
 // Serve uploaded images
 app.use('/uploads', express.static(uploadsDir));

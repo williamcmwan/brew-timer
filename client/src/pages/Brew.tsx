@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { ArrowLeft, Coffee, Droplets, Thermometer, Clock, Scale, Star } from "lucide-react";
+import { ArrowLeft, Coffee, Droplets, Thermometer, Clock, Scale, Star, GlassWater, Bean, Package, BookOpen } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import ImageUpload from "@/components/ImageUpload";
 import BrewTimerContent from "@/components/BrewTimerContent";
@@ -16,15 +16,15 @@ import BrewTimerContent from "@/components/BrewTimerContent";
 export default function Brew() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { coffeeBeans, grinders, brewers, recipes, addBrew, updateBrew, updateCoffeeBean, brewTemplates, brews } = useApp();
+  const { coffeeBeans, grinders, brewers, recipes, addBrew, updateBrew, updateCoffeeBean, brewTemplates, brews, coffeeServers } = useApp();
   
   const fromTimer = location.state?.fromTimer;
   const editBrew = location.state?.editBrew;
   const initialBrewData = editBrew || location.state?.brewData || location.state;
   const isEditing = !!editBrew;
   
-  // Get last brew for defaults
-  const lastBrew = brews.length > 0 ? brews[brews.length - 1] : null;
+  // Get most recent brew for defaults (brews are sorted by date DESC)
+  const lastBrew = brews.length > 0 ? brews[0] : null;
   
   const [step, setStep] = useState(fromTimer ? 3 : (location.state?.step || 1));
   const [selectedBeanId, setSelectedBeanId] = useState(initialBrewData?.coffeeBeanId || lastBrew?.coffeeBeanId || "");
@@ -35,6 +35,12 @@ export default function Brew() {
   const [selectedTemplateId, setSelectedTemplateId] = useState(
     editBrew?.templateNotes?.templateId || lastBrew?.templateNotes?.templateId || ""
   );
+  const getDefaultServerId = () => {
+    if (initialBrewData?.coffeeServerId) return initialBrewData.coffeeServerId;
+    if (lastBrew?.coffeeServerId && lastBrew.coffeeServerId !== "") return lastBrew.coffeeServerId;
+    return "none";
+  };
+  const [selectedServerId, setSelectedServerId] = useState(getDefaultServerId());
   
   // Brew parameters
   const [dose, setDose] = useState(initialBrewData?.dose?.toString() || "");
@@ -51,6 +57,7 @@ export default function Brew() {
   const [photo, setPhoto] = useState(editBrew?.photo || "");
   const [templateNotes, setTemplateNotes] = useState<Record<string, any>>(editBrew?.templateNotes?.fields || {});
   const [timerDialogOpen, setTimerDialogOpen] = useState(false);
+  const [finalWeightWithServer, setFinalWeightWithServer] = useState("");
 
   const selectedBean = coffeeBeans.find(b => b.id === selectedBeanId);
   const selectedBatch = selectedBean?.batches.find(b => b.id === selectedBatchId);
@@ -58,6 +65,7 @@ export default function Brew() {
   const selectedBrewer = brewers.find(b => b.id === selectedBrewerId);
   const selectedRecipe = recipes.find(r => r.id === selectedRecipeId);
   const selectedTemplate = brewTemplates.find(t => t.id === selectedTemplateId);
+  const selectedServer = coffeeServers.find(s => s.id === selectedServerId);
   
   const filteredRecipes = recipes.filter(
     r => r.grinderId === selectedGrinderId && r.brewerId === selectedBrewerId
@@ -104,7 +112,7 @@ export default function Brew() {
       }
     }
     if (step === 2) {
-      if (!dose || !grindSize || !water || !yieldAmount || !temperature || !brewTime) {
+      if (!dose || !grindSize || !water || !temperature) {
         toast({ title: "Please fill in all brew parameters", variant: "destructive" });
         return;
       }
@@ -153,6 +161,7 @@ export default function Brew() {
       grinderId: selectedGrinderId,
       brewerId: selectedBrewerId,
       recipeId: selectedRecipeId,
+      coffeeServerId: selectedServerId && selectedServerId !== "none" ? selectedServerId : undefined,
       dose: parseFloat(dose),
       grindSize: parseFloat(grindSize),
       water: parseFloat(water),
@@ -272,7 +281,12 @@ export default function Brew() {
             {step === 1 && (
               <div className="space-y-4 animate-fade-in">
                 <div>
-                  <Label htmlFor="bean">Coffee Bean</Label>
+                  <Label htmlFor="bean">
+                    <span className="flex items-center gap-2">
+                      <Bean className="h-4 w-4" />
+                      Coffee Bean
+                    </span>
+                  </Label>
                   <Select value={selectedBeanId} onValueChange={(value) => {
                     setSelectedBeanId(value);
                     setSelectedBatchId("");
@@ -292,7 +306,12 @@ export default function Brew() {
 
                 {selectedBean && selectedBean.batches.length > 0 && (
                   <div>
-                    <Label htmlFor="batch">Batch</Label>
+                    <Label htmlFor="batch">
+                      <span className="flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Batch
+                      </span>
+                    </Label>
                     <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
                       <SelectTrigger id="batch">
                         <SelectValue placeholder="Select batch" />
@@ -315,7 +334,12 @@ export default function Brew() {
                 )}
 
                 <div>
-                  <Label htmlFor="grinder">Grinder</Label>
+                  <Label htmlFor="grinder">
+                    <span className="flex items-center gap-2">
+                      <Coffee className="h-4 w-4" />
+                      Grinder
+                    </span>
+                  </Label>
                   <Select value={selectedGrinderId} onValueChange={setSelectedGrinderId}>
                     <SelectTrigger id="grinder">
                       <SelectValue placeholder="Select grinder" />
@@ -331,7 +355,12 @@ export default function Brew() {
                 </div>
 
                 <div>
-                  <Label htmlFor="brewer">Brewer</Label>
+                  <Label htmlFor="brewer">
+                    <span className="flex items-center gap-2">
+                      <Droplets className="h-4 w-4" />
+                      Brewer
+                    </span>
+                  </Label>
                   <Select value={selectedBrewerId} onValueChange={setSelectedBrewerId}>
                     <SelectTrigger id="brewer">
                       <SelectValue placeholder="Select brewer" />
@@ -347,7 +376,12 @@ export default function Brew() {
                 </div>
 
                 <div>
-                  <Label htmlFor="recipe">Recipe</Label>
+                  <Label htmlFor="recipe">
+                    <span className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4" />
+                      Recipe
+                    </span>
+                  </Label>
                   <Select value={selectedRecipeId} onValueChange={handleRecipeSelect}>
                     <SelectTrigger id="recipe">
                       <SelectValue placeholder="Select recipe" />
@@ -360,12 +394,34 @@ export default function Brew() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {filteredRecipes.length === 0 && selectedGrinderId && selectedBrewerId && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      No recipes available for this grinder and brewer combination. Please add a recipe in settings first.
+                    </p>
+                  )}
                 </div>
-                {filteredRecipes.length === 0 && selectedGrinderId && selectedBrewerId && (
-                  <p className="text-sm text-muted-foreground">
-                    No recipes available for this grinder and brewer combination. Please add a recipe in settings first.
-                  </p>
-                )}
+
+                <div>
+                  <Label htmlFor="server">
+                    <span className="flex items-center gap-2">
+                      <GlassWater className="h-4 w-4" />
+                      Coffee Server (Optional)
+                    </span>
+                  </Label>
+                  <Select value={selectedServerId} onValueChange={setSelectedServerId}>
+                    <SelectTrigger id="server">
+                      <SelectValue placeholder="Select coffee server" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No server</SelectItem>
+                      {coffeeServers.map((server) => (
+                        <SelectItem key={server.id} value={server.id}>
+                          {server.model} {server.maxVolume ? `(${server.maxVolume}ml)` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             )}
 
@@ -424,19 +480,6 @@ export default function Brew() {
                   </div>
 
                   <div>
-                    <Label htmlFor="yield">
-                      <span className="block">Yield (g)</span>
-                    </Label>
-                    <Input
-                      id="yield"
-                      type="number"
-                      step="0.1"
-                      value={yieldAmount}
-                      onChange={(e) => setYieldAmount(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
                     <Label htmlFor="temperature">
                       <span className="flex items-center gap-2">
                         <Thermometer className="h-4 w-4" />
@@ -449,21 +492,6 @@ export default function Brew() {
                       step="0.1"
                       value={temperature}
                       onChange={(e) => setTemperature(e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="brewTime">
-                      <span className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        Brew Time
-                      </span>
-                    </Label>
-                    <Input
-                      id="brewTime"
-                      value={brewTime}
-                      onChange={(e) => setBrewTime(e.target.value)}
-                      placeholder="e.g., 2:30"
                     />
                   </div>
                 </div>
@@ -598,7 +626,70 @@ export default function Brew() {
                   </div>
                 </div>
 
+                {selectedServer && selectedServer.emptyWeight && selectedServer.emptyWeight > 0 && (
+                  <div className="p-3 rounded-md bg-muted/50 space-y-3">
+                    <div>
+                      <Label htmlFor="finalWeight">
+                        <span className="flex items-center gap-2">
+                          <Scale className="h-4 w-4" />
+                          Final Weight with Server (g)
+                        </span>
+                      </Label>
+                      <Input
+                        id="finalWeight"
+                        type="number"
+                        step="0.1"
+                        value={finalWeightWithServer}
+                        onChange={(e) => {
+                          setFinalWeightWithServer(e.target.value);
+                          const finalWeight = parseFloat(e.target.value);
+                          if (!isNaN(finalWeight) && selectedServer.emptyWeight) {
+                            const calculatedYield = finalWeight - selectedServer.emptyWeight;
+                            if (calculatedYield > 0) {
+                              setYieldAmount(calculatedYield.toFixed(1));
+                            }
+                          }
+                        }}
+                        placeholder={`Server weight: ${selectedServer.emptyWeight}g`}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Server: {selectedServer.model} (empty: {selectedServer.emptyWeight}g)
+                      {yieldAmount && ` → Yield: ${yieldAmount}g`}
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="yield">
+                      <span className="block">Yield (g)</span>
+                    </Label>
+                    <Input
+                      id="yield"
+                      type="number"
+                      step="0.1"
+                      value={yieldAmount}
+                      onChange={(e) => setYieldAmount(e.target.value)}
+                      disabled={!!(selectedServer && selectedServer.emptyWeight && selectedServer.emptyWeight > 0 && finalWeightWithServer)}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="brewTime">
+                      <span className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Brew Time
+                      </span>
+                    </Label>
+                    <Input
+                      id="brewTime"
+                      value={brewTime}
+                      onChange={(e) => setBrewTime(e.target.value)}
+                      placeholder="e.g., 2:30"
+                    />
+                  </div>
+
                   <div>
                     <Label htmlFor="tds">TDS (%) - Optional</Label>
                     <Input

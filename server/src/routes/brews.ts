@@ -11,6 +11,7 @@ interface BrewRow {
   grinder_id: number | null;
   brewer_id: number | null;
   recipe_id: number | null;
+  coffee_server_id: number | null;
   dose: number | null;
   grind_size: number | null;
   water: number | null;
@@ -32,7 +33,7 @@ router.get('/', (req, res) => {
   
   const brews = db.prepare(`
     SELECT id, date, coffee_bean_id, batch_id, grinder_id, brewer_id, recipe_id,
-           dose, grind_size, water, yield, temperature, brew_time, tds, 
+           coffee_server_id, dose, grind_size, water, yield, temperature, brew_time, tds, 
            extraction_yield, rating, comment, photo, favorite, template_notes
     FROM brews WHERE user_id = ? ORDER BY date DESC
   `).all(userId) as BrewRow[];
@@ -45,6 +46,7 @@ router.get('/', (req, res) => {
     grinderId: b.grinder_id ? String(b.grinder_id) : '',
     brewerId: b.brewer_id ? String(b.brewer_id) : '',
     recipeId: b.recipe_id ? String(b.recipe_id) : '',
+    coffeeServerId: b.coffee_server_id ? String(b.coffee_server_id) : '',
     dose: b.dose || 0,
     grindSize: b.grind_size || 0,
     water: b.water || 0,
@@ -67,7 +69,7 @@ router.post('/', (req, res) => {
   const userId = req.headers['x-user-id'];
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   
-  const { coffeeBeanId, batchId, grinderId, brewerId, recipeId, dose, grindSize,
+  const { coffeeBeanId, batchId, grinderId, brewerId, recipeId, coffeeServerId, dose, grindSize,
           water, yield: yieldVal, temperature, brewTime, tds, extractionYield,
           rating, comment, photo, favorite, templateNotes } = req.body;
   
@@ -75,17 +77,17 @@ router.post('/', (req, res) => {
   
   const result = db.prepare(`
     INSERT INTO brews (user_id, date, coffee_bean_id, batch_id, grinder_id, brewer_id, 
-                       recipe_id, dose, grind_size, water, yield, temperature, brew_time, 
+                       recipe_id, coffee_server_id, dose, grind_size, water, yield, temperature, brew_time, 
                        tds, extraction_yield, rating, comment, photo, favorite, template_notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(userId, date, coffeeBeanId || null, batchId || null, grinderId || null, 
-         brewerId || null, recipeId || null, dose, grindSize, water, yieldVal, temperature,
+         brewerId || null, recipeId || null, coffeeServerId || null, dose, grindSize, water, yieldVal, temperature,
          brewTime, tds, extractionYield, rating, comment, photo, favorite ? 1 : 0,
          templateNotes ? JSON.stringify(templateNotes) : null);
   
   res.json({
     id: String(result.lastInsertRowid), date, coffeeBeanId, batchId, grinderId, brewerId,
-    recipeId, dose, grindSize, water, yield: yieldVal, temperature, brewTime, tds,
+    recipeId, coffeeServerId, dose, grindSize, water, yield: yieldVal, temperature, brewTime, tds,
     extractionYield, rating, comment, photo, favorite: Boolean(favorite), templateNotes
   });
 });
@@ -95,18 +97,18 @@ router.put('/:id', (req, res) => {
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   
   const { id } = req.params;
-  const { coffeeBeanId, batchId, grinderId, brewerId, recipeId, dose, grindSize,
+  const { coffeeBeanId, batchId, grinderId, brewerId, recipeId, coffeeServerId, dose, grindSize,
           water, yield: yieldVal, temperature, brewTime, tds, extractionYield,
           rating, comment, photo, favorite, templateNotes } = req.body;
   
   db.prepare(`
     UPDATE brews SET coffee_bean_id = ?, batch_id = ?, grinder_id = ?, brewer_id = ?, 
-           recipe_id = ?, dose = ?, grind_size = ?, water = ?, yield = ?, temperature = ?, 
+           recipe_id = ?, coffee_server_id = ?, dose = ?, grind_size = ?, water = ?, yield = ?, temperature = ?, 
            brew_time = ?, tds = ?, extraction_yield = ?, rating = ?, comment = ?, 
            photo = ?, favorite = ?, template_notes = ?
     WHERE id = ? AND user_id = ?
   `).run(coffeeBeanId || null, batchId || null, grinderId || null, brewerId || null,
-         recipeId || null, dose, grindSize, water, yieldVal, temperature, brewTime,
+         recipeId || null, coffeeServerId || null, dose, grindSize, water, yieldVal, temperature, brewTime,
          tds, extractionYield, rating, comment, photo, favorite ? 1 : 0,
          templateNotes ? JSON.stringify(templateNotes) : null, id, userId);
   

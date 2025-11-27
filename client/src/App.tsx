@@ -18,6 +18,7 @@ import BrewComparison from "./pages/BrewComparison";
 import BrewTimer from "./pages/BrewTimer";
 import BrewTemplates from "./pages/BrewTemplates";
 import Inventory from "./pages/Inventory";
+import CoffeeServers from "./pages/CoffeeServers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -82,6 +83,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CoffeeBeans />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/servers"
+              element={
+                <ProtectedRoute>
+                  <CoffeeServers />
                 </ProtectedRoute>
               }
             />

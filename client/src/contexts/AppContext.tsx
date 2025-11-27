@@ -41,6 +41,14 @@ export interface Brewer {
   type: "espresso" | "pour-over";
 }
 
+export interface CoffeeServer {
+  id: string;
+  model: string;
+  photo?: string;
+  maxVolume?: number;
+  emptyWeight?: number;
+}
+
 export interface RecipeStep {
   description: string;
   waterAmount: number;
@@ -103,6 +111,7 @@ export interface Brew {
   grinderId: string;
   brewerId: string;
   recipeId: string;
+  coffeeServerId?: string;
   dose: number;
   grindSize: number;
   water: number;
@@ -150,6 +159,10 @@ interface AppContextType {
   addBrewTemplate: (template: Omit<BrewTemplate, "id">) => Promise<void>;
   updateBrewTemplate: (id: string, template: Partial<BrewTemplate>) => Promise<void>;
   deleteBrewTemplate: (id: string) => Promise<void>;
+  coffeeServers: CoffeeServer[];
+  addCoffeeServer: (server: Omit<CoffeeServer, "id">) => Promise<void>;
+  updateCoffeeServer: (id: string, server: Partial<CoffeeServer>) => Promise<void>;
+  deleteCoffeeServer: (id: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -176,11 +189,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [coffeeBeans, setCoffeeBeans] = useState<CoffeeBean[]>([]);
   const [brews, setBrews] = useState<Brew[]>([]);
   const [brewTemplates, setBrewTemplates] = useState<BrewTemplate[]>([]);
+  const [coffeeServers, setCoffeeServers] = useState<CoffeeServer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = useCallback(async () => {
     try {
-      const [grindersData, brewersData, recipesData, beansData, brewsData, templatesData] = 
+      const [grindersData, brewersData, recipesData, beansData, brewsData, templatesData, serversData] = 
         await Promise.all([
           api.grinders.list(),
           api.brewers.list(),
@@ -188,6 +202,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           api.coffeeBeans.list(),
           api.brews.list(),
           api.brewTemplates.list(),
+          api.coffeeServers.list().catch(() => []),
         ]);
       setGrinders(grindersData.map((g: any) => ({ ...g, id: String(g.id) })));
       setBrewers(brewersData.map((b: any) => ({ ...b, id: String(b.id) })));
@@ -195,6 +210,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCoffeeBeans(beansData);
       setBrews(brewsData);
       setBrewTemplates(templatesData);
+      setCoffeeServers(serversData);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
@@ -233,6 +249,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCoffeeBeans([]);
     setBrews([]);
     setBrewTemplates([]);
+    setCoffeeServers([]);
     localStorage.removeItem("user");
     localStorage.removeItem("userId");
   };
@@ -342,6 +359,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setBrewTemplates(prev => prev.filter(t => t.id !== id));
   };
 
+  const addCoffeeServer = async (server: Omit<CoffeeServer, "id">) => {
+    const newServer = await api.coffeeServers.create(server);
+    setCoffeeServers(prev => [...prev, { ...newServer, id: String(newServer.id) }]);
+  };
+
+  const updateCoffeeServer = async (id: string, server: Partial<CoffeeServer>) => {
+    await api.coffeeServers.update(id, server);
+    setCoffeeServers(prev => prev.map(s => s.id === id ? { ...s, ...server } : s));
+  };
+
+  const deleteCoffeeServer = async (id: string) => {
+    await api.coffeeServers.delete(id);
+    setCoffeeServers(prev => prev.filter(s => s.id !== id));
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -352,6 +384,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         coffeeBeans, addCoffeeBean, updateCoffeeBean, deleteCoffeeBean, toggleCoffeeBeanFavorite,
         brews, addBrew, updateBrew, deleteBrew, toggleBrewFavorite,
         brewTemplates, addBrewTemplate, updateBrewTemplate, deleteBrewTemplate,
+        coffeeServers, addCoffeeServer, updateCoffeeServer, deleteCoffeeServer,
       }}
     >
       {children}

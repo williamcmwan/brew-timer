@@ -78,4 +78,11 @@ export const api = {
     update: (id: string, data: any) => request<any>(`/brew-templates/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<any>(`/brew-templates/${id}`, { method: 'DELETE' }),
   },
+  
+  coffeeServers: {
+    list: () => request<any[]>('/coffee-servers'),
+    create: (data: any) => request<any>('/coffee-servers', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: any) => request<any>(`/coffee-servers/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<any>(`/coffee-servers/${id}`, { method: 'DELETE' }),
+  },
 };
