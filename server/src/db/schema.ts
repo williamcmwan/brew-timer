@@ -12,8 +12,11 @@ export function initializeDatabase() {
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
+      password TEXT,
       name TEXT NOT NULL,
+      auth_provider TEXT DEFAULT 'email',
+      provider_id TEXT,
+      avatar_url TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -152,5 +155,45 @@ export function initializeDatabase() {
   const brewsColumns = db.prepare("PRAGMA table_info(brews)").all() as any[];
   if (!brewsColumns.some((col: any) => col.name === 'coffee_server_id')) {
     db.exec(`ALTER TABLE brews ADD COLUMN coffee_server_id INTEGER REFERENCES coffee_servers(id)`);
+  }
+
+  // Add social auth columns to users if they don't exist
+  const usersColumns = db.prepare("PRAGMA table_info(users)").all() as any[];
+  if (!usersColumns.some((col: any) => col.name === 'auth_provider')) {
+    db.exec(`ALTER TABLE users ADD COLUMN auth_provider TEXT DEFAULT 'email'`);
+  }
+  if (!usersColumns.some((col: any) => col.name === 'provider_id')) {
+    db.exec(`ALTER TABLE users ADD COLUMN provider_id TEXT`);
+  }
+  if (!usersColumns.some((col: any) => col.name === 'avatar_url')) {
+    db.exec(`ALTER TABLE users ADD COLUMN avatar_url TEXT`);
+  }
+
+  // Migrate users table to make password nullable (for social auth)
+  const passwordCol = usersColumns.find((col: any) => col.name === 'password');
+  if (passwordCol && passwordCol.notnull === 1) {
+    db.exec(`
+      PRAGMA foreign_keys=OFF;
+      CREATE TABLE users_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        password TEXT,
+        name TEXT NOT NULL,
+        auth_provider TEXT DEFAULT 'email',
+        provider_id TEXT,
+        avatar_url TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO users_new (id, email, password, name, auth_provider, provider_id, avatar_url, created_at)
+        SELECT id, email, password, name, 
+          COALESCE(auth_provider, 'email'), 
+          provider_id, 
+          avatar_url, 
+          created_at 
+        FROM users;
+      DROP TABLE users;
+      ALTER TABLE users_new RENAME TO users;
+      PRAGMA foreign_keys=ON;
+    `);
   }
 }

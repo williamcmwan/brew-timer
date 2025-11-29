@@ -20,17 +20,30 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json();
 }
 
+export interface AuthUser {
+  id: number;
+  email: string;
+  name: string;
+  authProvider?: string;
+  avatarUrl?: string;
+}
+
 export const api = {
   auth: {
     login: (email: string, password: string) =>
-      request<{ id: number; email: string; name: string }>('/auth/login', {
+      request<AuthUser>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       }),
     signup: (email: string, password: string, name: string) =>
-      request<{ id: number; email: string; name: string }>('/auth/signup', {
+      request<AuthUser>('/auth/signup', {
         method: 'POST',
         body: JSON.stringify({ email, password, name }),
+      }),
+    social: (provider: 'google' | 'apple', providerId: string, email: string, name?: string, avatarUrl?: string) =>
+      request<AuthUser>('/auth/social', {
+        method: 'POST',
+        body: JSON.stringify({ provider, providerId, email, name, avatarUrl }),
       }),
   },
   

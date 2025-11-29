@@ -5,6 +5,8 @@ export interface User {
   id: number;
   email: string;
   name: string;
+  authProvider?: string;
+  avatarUrl?: string;
 }
 
 export interface BrewTemplate {
@@ -131,6 +133,7 @@ interface AppContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string) => Promise<void>;
+  socialLogin: (provider: 'google' | 'apple', providerId: string, email: string, name?: string, avatarUrl?: string) => Promise<void>;
   logout: () => void;
   grinders: Grinder[];
   addGrinder: (grinder: Omit<Grinder, "id">) => Promise<void>;
@@ -239,6 +242,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUser(userData);
     localStorage.setItem("user", JSON.stringify(userData));
     localStorage.setItem("userId", String(userData.id));
+  };
+
+  const socialLogin = async (provider: 'google' | 'apple', providerId: string, email: string, name?: string, avatarUrl?: string) => {
+    const userData = await api.auth.social(provider, providerId, email, name, avatarUrl);
+    setUser(userData);
+    localStorage.setItem("user", JSON.stringify(userData));
+    localStorage.setItem("userId", String(userData.id));
+    await loadData();
   };
 
   const logout = () => {
@@ -377,7 +388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
-        user, login, signup, logout,
+        user, login, signup, socialLogin, logout,
         grinders, addGrinder, updateGrinder, deleteGrinder,
         brewers, addBrewer, updateBrewer, deleteBrewer,
         recipes, addRecipe, updateRecipe, deleteRecipe, toggleRecipeFavorite,
