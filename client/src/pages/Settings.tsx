@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Coffee, Droplet, BookOpen, Bean, FileText, GlassWater, ChevronRight, Key } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ArrowLeft, Coffee, Droplet, BookOpen, Bean, FileText, GlassWater, ChevronRight, ChevronDown, Key } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,6 +17,7 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isPasswordSectionOpen, setIsPasswordSectionOpen] = useState(false);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,32 +78,41 @@ export default function Settings() {
         </div>
 
         {isEmailUser && (
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Key className="h-5 w-5" />
-                Change Password
-              </CardTitle>
-              <CardDescription>Update your account password</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required disabled={isChangingPassword} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} disabled={isChangingPassword} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
-                  <Input id="confirmNewPassword" type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} required minLength={6} disabled={isChangingPassword} />
-                </div>
-                <Button type="submit" disabled={isChangingPassword}>{isChangingPassword ? "Changing..." : "Change Password"}</Button>
-              </form>
-            </CardContent>
-          </Card>
+          <Collapsible open={isPasswordSectionOpen} onOpenChange={setIsPasswordSectionOpen}>
+            <Card className="mt-6">
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Key className="h-5 w-5" />
+                      Change Password
+                    </span>
+                    <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${isPasswordSectionOpen ? "rotate-180" : ""}`} />
+                  </CardTitle>
+                  <CardDescription>Update your account password</CardDescription>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent>
+                  <form onSubmit={handleChangePassword} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="currentPassword">Current Password</Label>
+                      <Input id="currentPassword" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required disabled={isChangingPassword} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="newPassword">New Password</Label>
+                      <Input id="newPassword" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} disabled={isChangingPassword} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
+                      <Input id="confirmNewPassword" type="password" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} required minLength={6} disabled={isChangingPassword} />
+                    </div>
+                    <Button type="submit" disabled={isChangingPassword}>{isChangingPassword ? "Changing..." : "Change Password"}</Button>
+                  </form>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
         )}
       </div>
     </div>
