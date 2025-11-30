@@ -139,37 +139,40 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
     const roastDate = data.roastDate && data.roastDate.match(/^\d{4}-\d{2}-\d{2}$/) ? data.roastDate : today;
     const weight = data.weight && data.weight > 0 ? data.weight : 250;
     
-    // Check for existing bean with same name, roaster (partial match), and country
-    const normalizeStr = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
-    const roasterMatches = (existing: string, scanned: string) => {
-      const a = normalizeStr(existing);
-      const b = normalizeStr(scanned);
-      // Exact match or one contains the other (partial match)
-      return a === b || a.includes(b) || b.includes(a);
-    };
-    const existingBean = coffeeBeans.find(b => 
-      normalizeStr(b.name) === normalizeStr(data.name || '') &&
-      roasterMatches(b.roaster, data.roaster || '') &&
-      normalizeStr(b.country) === normalizeStr(data.country || '')
-    );
-    
-    if (existingBean) {
-      // Show review dialog for adding batch to existing bean
-      const newBatch: CoffeeBatch = {
-        id: Date.now().toString(),
-        price: 0,
-        roastDate: roastDate,
-        weight: weight,
-        currentWeight: weight,
-        purchaseDate: today,
-        isActive: true,
-        notes: "",
+    // Skip existing bean check when editing - just update the form
+    if (!bean) {
+      // Check for existing bean with same name, roaster (partial match), and country
+      const normalizeStr = (s: string) => s.toLowerCase().trim().replace(/\s+/g, ' ');
+      const roasterMatches = (existing: string, scanned: string) => {
+        const a = normalizeStr(existing);
+        const b = normalizeStr(scanned);
+        // Exact match or one contains the other (partial match)
+        return a === b || a.includes(b) || b.includes(a);
       };
-      setPendingBatchAdd({ bean: existingBean, batch: newBatch });
-      return;
+      const existingBean = coffeeBeans.find(b => 
+        normalizeStr(b.name) === normalizeStr(data.name || '') &&
+        roasterMatches(b.roaster, data.roaster || '') &&
+        normalizeStr(b.country) === normalizeStr(data.country || '')
+      );
+      
+      if (existingBean) {
+        // Show review dialog for adding batch to existing bean
+        const newBatch: CoffeeBatch = {
+          id: Date.now().toString(),
+          price: 0,
+          roastDate: roastDate,
+          weight: weight,
+          currentWeight: weight,
+          purchaseDate: today,
+          isActive: true,
+          notes: "",
+        };
+        setPendingBatchAdd({ bean: existingBean, batch: newBatch });
+        return;
+      }
     }
     
-    // No existing bean found - fill form for new bean
+    // Fill form with scanned data (for new bean or editing existing)
     setValue("name", data.name || "");
     setValue("roaster", data.roaster || "");
     setValue("country", data.country || "");
@@ -196,16 +199,19 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
       setValue("photo", "");
     }
     
-    setBatches([{
-      id: Date.now().toString(),
-      price: 0,
-      roastDate: roastDate,
-      weight: weight,
-      currentWeight: weight,
-      purchaseDate: today,
-      isActive: true,
-      notes: "",
-    }]);
+    // Only add a new batch when creating new bean, not when editing
+    if (!bean) {
+      setBatches([{
+        id: Date.now().toString(),
+        price: 0,
+        roastDate: roastDate,
+        weight: weight,
+        currentWeight: weight,
+        purchaseDate: today,
+        isActive: true,
+        notes: "",
+      }]);
+    }
   };
 
   const updateBatch = (id: string, field: keyof CoffeeBatch, value: any) => {
@@ -283,7 +289,7 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>{isCloning ? "Clone Coffee Bean" : bean ? "Edit Coffee Bean" : "Add Coffee Bean"}</DialogTitle>
-            {!bean && !isCloning && (
+            {!isCloning && (
               <Button
                 type="button"
                 variant="outline"

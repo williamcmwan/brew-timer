@@ -144,10 +144,11 @@ app.use('/api/coffee-servers', authMiddleware, coffeeServersRoutes);
 app.use('/api/ai', authMiddleware, aiRoutes);
 
 // Serve uploaded images from user-specific folders
-// Path format: /uploads/{user_folder}/{filename}.jpg
+// Path format: /uploads/{user_folder}/{filename}
 app.use('/uploads', (req, res, next) => {
-  // Validate path format: /{user_folder}/{32-hex-chars}.jpg
-  const pathMatch = req.path.match(/^\/([a-z0-9._-]+)\/([a-f0-9]{32}\.jpg)$/);
+  // Validate path format: /{user_folder}/{safe_filename}
+  // Allow alphanumeric, dots, dashes, underscores in folder and filename
+  const pathMatch = req.path.match(/^\/([a-z0-9._-]+)\/([a-z0-9._-]+\.(jpg|jpeg|png|webp))$/i);
   if (!pathMatch) {
     return res.status(400).json({ error: 'Invalid path format' });
   }
