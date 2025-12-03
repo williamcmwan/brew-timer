@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { ArrowLeft, Plus, Pencil, Trash2, FileText, GripVertical } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, FileText, GripVertical, Copy } from "lucide-react";
+import { api } from "@/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -41,12 +42,26 @@ export default function BrewTemplates() {
   const [fields, setFields] = useState<BrewTemplateField[]>([]);
   const [editingField, setEditingField] = useState<BrewTemplateField | null>(null);
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
+  const [adminTemplates, setAdminTemplates] = useState<BrewTemplate[]>([]);
+  const [showAdminPicker, setShowAdminPicker] = useState(false);
+
+  useEffect(() => {
+    api.admin.getBrewTemplates().then(setAdminTemplates).catch(() => setAdminTemplates([]));
+  }, []);
 
   const handleAdd = () => {
     setEditingTemplate(null);
     setTemplateName("");
     setFields([]);
+    setShowAdminPicker(false);
     setDialogOpen(true);
+  };
+
+  const handleCopyFromAdmin = (adminTemplate: BrewTemplate) => {
+    setTemplateName(adminTemplate.name);
+    setFields([...adminTemplate.fields.map(f => ({ ...f, id: Date.now().toString() + Math.random() }))]);
+    setShowAdminPicker(false);
+    toast({ title: "Copied", description: `Copied "${adminTemplate.name}" template` });
   };
 
   const handleEdit = (template: BrewTemplate) => {
@@ -216,6 +231,44 @@ export default function BrewTemplates() {
             </DialogHeader>
 
             <div className="space-y-4 py-4">
+              {!editingTemplate && adminTemplates.length > 0 && (
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => setShowAdminPicker(!showAdminPicker)}
+                  >
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy from templates
+                  </Button>
+                  {showAdminPicker && (
+                    <div className="border rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto bg-muted/50">
+                      {adminTemplates.map((at) => (
+                        <Button
+                          key={at.id}
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start text-left h-auto py-2"
+                          onClick={() => handleCopyFromAdmin(at)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                            <div className="truncate">
+                              <span className="font-medium">{at.name}</span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({at.fields.length} field{at.fields.length !== 1 ? 's' : ''})
+                              </span>
+                            </div>
+                          </div>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="templateName">Template Name</Label>
                 <Input

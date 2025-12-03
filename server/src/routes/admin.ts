@@ -82,4 +82,22 @@ router.get('/recipes', (req: AuthRequest, res: Response) => {
   })));
 });
 
+// Get admin brew templates
+router.get('/brew-templates', (req: AuthRequest, res: Response) => {
+  const adminId = getAdminUserId();
+  if (!adminId) {
+    return res.json([]);
+  }
+  
+  const templates = db.prepare(`
+    SELECT id, name, fields FROM brew_templates WHERE user_id = ?
+  `).all(adminId) as any[];
+  
+  res.json(templates.map(t => ({
+    id: String(t.id),
+    name: t.name,
+    fields: JSON.parse(t.fields),
+  })));
+});
+
 export default router;

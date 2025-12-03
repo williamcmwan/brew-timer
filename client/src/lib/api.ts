@@ -223,5 +223,6 @@ export const api = {
     getBrewers: () => request<any[]>('/admin/brewers'),
     getCoffeeServers: () => request<any[]>('/admin/coffee-servers'),
     getRecipes: () => request<any[]>('/admin/recipes'),
+    getBrewTemplates: () => request<any[]>('/admin/brew-templates'),
   },
 };
