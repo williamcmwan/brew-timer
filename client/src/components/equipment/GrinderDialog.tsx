@@ -37,7 +37,9 @@ export function GrinderDialog({ open, onOpenChange, grinder }: GrinderDialogProp
 
   useEffect(() => {
     if (open && !grinder) {
-      api.admin.getGrinders().then(setAdminGrinders).catch(() => setAdminGrinders([]));
+      api.admin.getGrinders()
+        .then((data) => setAdminGrinders([...data].sort((a, b) => a.model.localeCompare(b.model))))
+        .catch(() => setAdminGrinders([]));
     }
   }, [open, grinder]);
 

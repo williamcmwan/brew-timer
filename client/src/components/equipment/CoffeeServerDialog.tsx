@@ -36,7 +36,9 @@ export function CoffeeServerDialog({ open, onOpenChange, server }: CoffeeServerD
 
   useEffect(() => {
     if (open && !server) {
-      api.admin.getCoffeeServers().then(setAdminServers).catch(() => setAdminServers([]));
+      api.admin.getCoffeeServers()
+        .then((data) => setAdminServers([...data].sort((a, b) => a.model.localeCompare(b.model))))
+        .catch(() => setAdminServers([]));
     }
   }, [open, server]);
 

@@ -88,7 +88,9 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
 
   useEffect(() => {
     if (open && !recipe && !isCloning) {
-      api.admin.getRecipes().then(setAdminRecipes).catch(() => setAdminRecipes([]));
+      api.admin.getRecipes()
+        .then((data) => setAdminRecipes([...data].sort((a, b) => a.name.localeCompare(b.name))))
+        .catch(() => setAdminRecipes([]));
     }
   }, [open, recipe, isCloning]);
 

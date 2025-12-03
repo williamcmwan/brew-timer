@@ -36,7 +36,9 @@ export function BrewerDialog({ open, onOpenChange, brewer }: BrewerDialogProps) 
 
   useEffect(() => {
     if (open && !brewer) {
-      api.admin.getBrewers().then(setAdminBrewers).catch(() => setAdminBrewers([]));
+      api.admin.getBrewers()
+        .then((data) => setAdminBrewers([...data].sort((a, b) => a.model.localeCompare(b.model))))
+        .catch(() => setAdminBrewers([]));
     }
   }, [open, brewer]);
 
