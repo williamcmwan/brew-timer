@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
 import { 
   ArrowLeft, 
@@ -40,7 +39,6 @@ export default function Inventory() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [usageDialogOpen, setUsageDialogOpen] = useState(false);
   const [usageAmount, setUsageAmount] = useState("");
-  const [usageNotes, setUsageNotes] = useState("");
   const [lowStockThreshold, setLowStockThreshold] = useState("");
   const [updateWeightDialogOpen, setUpdateWeightDialogOpen] = useState(false);
   const [newWeight, setNewWeight] = useState("");
@@ -125,7 +123,6 @@ export default function Inventory() {
           ...batch,
           currentWeight: newWeight,
           isActive: newWeight > 0,
-          notes: usageNotes ? `${batch.notes || ""}\n${new Date().toLocaleDateString()}: Used ${amount}g - ${usageNotes}`.trim() : batch.notes
         };
       }
       return batch;
@@ -140,7 +137,6 @@ export default function Inventory() {
 
     setUsageDialogOpen(false);
     setUsageAmount("");
-    setUsageNotes("");
     setEditingBatch(null);
   };
 
@@ -452,15 +448,6 @@ export default function Inventory() {
                   placeholder="18"
                   value={usageAmount}
                   onChange={(e) => setUsageAmount(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes (optional)</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="e.g., Pour over brew, espresso shots..."
-                  value={usageNotes}
-                  onChange={(e) => setUsageNotes(e.target.value)}
                 />
               </div>
             </div>

@@ -63,6 +63,7 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
   const [pendingWeightAdjust, setPendingWeightAdjust] = useState<PendingWeightAdjust | null>(null);
   const [adjustedRemaining, setAdjustedRemaining] = useState<number>(0);
   const [showEmptyBatches, setShowEmptyBatches] = useState(false);
+  const [originallyEmptyBatchIds, setOriginallyEmptyBatchIds] = useState<Set<string>>(new Set());
 
   const {
     register,
@@ -106,10 +107,15 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
       setValue("url", bean.url || "");
       setValue("photo", bean.photo || "");
       // Don't copy batches when cloning - start fresh
-      setBatches(isCloning ? [] : (bean.batches || []));
+      const batchesToSet = isCloning ? [] : (bean.batches || []);
+      setBatches(batchesToSet);
+      // Track which batches were originally empty (from database)
+      const emptyIds = new Set(batchesToSet.filter(b => (b.currentWeight || 0) === 0).map(b => b.id));
+      setOriginallyEmptyBatchIds(emptyIds);
     } else {
       reset();
       setBatches([]);
+      setOriginallyEmptyBatchIds(new Set());
     }
   }, [bean, isCloning, setValue, reset]);
 
@@ -414,7 +420,7 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
                 Add Batch
               </Button>
             </div>
-            {batches.some((b) => (b.currentWeight || 0) === 0) && (
+            {batches.some((b) => originallyEmptyBatchIds.has(b.id)) && (
               <Button
                 type="button"
                 variant="ghost"
@@ -423,13 +429,13 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
                 onClick={() => setShowEmptyBatches(!showEmptyBatches)}
               >
                 {showEmptyBatches ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />}
-                {showEmptyBatches ? "Hide" : "Show"} empty batches ({batches.filter((b) => (b.currentWeight || 0) === 0).length})
+                {showEmptyBatches ? "Hide" : "Show"} empty batches ({batches.filter((b) => originallyEmptyBatchIds.has(b.id)).length})
               </Button>
             )}
-            {batches.filter((b) => (b.currentWeight || 0) > 0 || showEmptyBatches).map((batch) => (
+            {batches.filter((b) => !originallyEmptyBatchIds.has(b.id) || showEmptyBatches).map((batch) => (
               <div key={batch.id} className="flex gap-2 items-start p-3 rounded-lg bg-muted">
                 <div className="flex-1 space-y-2">
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-[1fr_1.2fr_1.2fr] gap-2">
                     <div>
                       <Label className="text-xs">Price ({symbol})</Label>
                       <Input
@@ -447,26 +453,31 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
                       <Input
                         type="number"
                         placeholder="Weight"
+                        min={1}
                         value={batch.weight === 0 ? "" : batch.weight}
                         onChange={(e) => {
                           const weight = e.target.value === "" ? 0 : parseFloat(e.target.value);
                           updateBatch(batch.id, "weight", weight);
-                          if (!bean) {
-                            updateBatch(batch.id, "currentWeight", weight);
-                          }
                         }}
                         onBlur={(e) => {
-                          const weight = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                          const weight = e.target.value === "" ? 1 : parseFloat(e.target.value);
+                          // Ensure weight is at least 1
+                          const finalWeight = Math.max(1, weight);
+                          updateBatch(batch.id, "weight", finalWeight);
+
                           const currentRemaining = batch.currentWeight || 0;
-                          
-                          // If editing existing bean and new weight is less than remaining, ask user
-                          if (bean && weight < currentRemaining && weight > 0) {
+
+                          // For new beans, sync remaining to weight by default
+                          if (!bean) {
+                            updateBatch(batch.id, "currentWeight", finalWeight);
+                          } else if (finalWeight < currentRemaining && finalWeight > 0) {
+                            // If editing existing bean and new weight is less than remaining, ask user
                             setPendingWeightAdjust({
                               batchId: batch.id,
-                              newWeight: weight,
-                              currentRemaining: currentRemaining
+                              newWeight: finalWeight,
+                              currentRemaining: currentRemaining,
                             });
-                            setAdjustedRemaining(weight);
+                            setAdjustedRemaining(finalWeight);
                           }
                         }}
                         className="px-2"
@@ -476,9 +487,20 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
                       <Label className="text-xs">Remaining (g)</Label>
                       <Input
                         type="number"
-                        value={batch.currentWeight || 0}
-                        disabled
-                        className="px-2 bg-background"
+                        min={0}
+                        max={batch.weight}
+                        value={batch.currentWeight === 0 ? "" : batch.currentWeight}
+                        onChange={(e) => {
+                          const remaining = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                          updateBatch(batch.id, "currentWeight", remaining);
+                        }}
+                        onBlur={(e) => {
+                          const remaining = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                          // Cap remaining at weight
+                          const finalRemaining = Math.min(Math.max(0, remaining), batch.weight);
+                          updateBatch(batch.id, "currentWeight", finalRemaining);
+                        }}
+                        className="px-2"
                       />
                     </div>
                   </div>
