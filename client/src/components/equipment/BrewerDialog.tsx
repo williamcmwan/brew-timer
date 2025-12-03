@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -9,8 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Copy } from "lucide-react";
 import type { Brewer } from "@/contexts/AppContext";
 import ImageUpload from "@/components/ImageUpload";
+import { api } from "@/lib/api";
 
 const brewerSchema = z.object({
   model: z.string().trim().min(1, "Model is required").max(100),
@@ -29,6 +31,14 @@ interface BrewerDialogProps {
 export function BrewerDialog({ open, onOpenChange, brewer }: BrewerDialogProps) {
   const { addBrewer, updateBrewer } = useApp();
   const { toast } = useToast();
+  const [adminBrewers, setAdminBrewers] = useState<Brewer[]>([]);
+  const [showAdminPicker, setShowAdminPicker] = useState(false);
+
+  useEffect(() => {
+    if (open && !brewer) {
+      api.admin.getBrewers().then(setAdminBrewers).catch(() => setAdminBrewers([]));
+    }
+  }, [open, brewer]);
 
   const {
     register,
@@ -79,6 +89,14 @@ export function BrewerDialog({ open, onOpenChange, brewer }: BrewerDialogProps) 
     }
   };
 
+  const handleCopyFromAdmin = (adminBrewer: Brewer) => {
+    setValue("model", adminBrewer.model);
+    setValue("photo", adminBrewer.photo || "");
+    setValue("type", adminBrewer.type);
+    setShowAdminPicker(false);
+    toast({ title: "Copied", description: `Copied "${adminBrewer.model}" settings` });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -86,6 +104,43 @@ export function BrewerDialog({ open, onOpenChange, brewer }: BrewerDialogProps) 
           <DialogTitle>{brewer ? "Edit Brewer" : "Add Brewer"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {!brewer && adminBrewers.length > 0 && (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowAdminPicker(!showAdminPicker)}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy from templates
+              </Button>
+              {showAdminPicker && (
+                <div className="border rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto bg-muted/50">
+                  {adminBrewers.map((ab) => (
+                    <Button
+                      key={ab.id}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-left h-auto py-2"
+                      onClick={() => handleCopyFromAdmin(ab)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {ab.photo ? (
+                          <img src={ab.photo} alt={ab.model} className="w-8 h-8 rounded object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">—</div>
+                        )}
+                        <span className="truncate">{ab.model} ({ab.type})</span>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="model">Model *</Label>
             <Input id="model" {...register("model")} placeholder="e.g., V60, La Marzocco" />

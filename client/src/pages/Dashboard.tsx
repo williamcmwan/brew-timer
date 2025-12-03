@@ -106,7 +106,7 @@ export default function Dashboard() {
                           {new Date(brew.date).toLocaleDateString()}
                         </p>
                       </div>
-                      {brew.rating && (
+                      {brew.rating != null && brew.rating > 0 && (
                         <div className="flex items-center gap-1">
                           <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
                           <span className="text-sm font-medium">{brew.rating}</span>

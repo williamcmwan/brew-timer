@@ -138,7 +138,7 @@ export default function BrewHistory() {
   }, [brews, filterBean, filterRating, filterFavorites, sortBy]);
 
   const renderStars = (rating: number | undefined) => {
-    if (!rating) return null;
+    if (rating == null || rating === 0) return null;
     return (
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((star) => (

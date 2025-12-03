@@ -22,11 +22,13 @@ export default function Brew() {
   const editBrew = location.state?.editBrew;
   const initialBrewData = editBrew || location.state?.brewData || location.state;
   const isEditing = !!editBrew;
+  const [savedBrewId, setSavedBrewId] = useState<string | null>(editBrew?.id || null);
   
   // Get most recent brew for defaults (brews are sorted by date DESC)
   const lastBrew = brews.length > 0 ? brews[0] : null;
   
   const [step, setStep] = useState(fromTimer ? 3 : (location.state?.step || 1));
+  const totalSteps = 4;
   const [selectedBeanId, setSelectedBeanId] = useState(initialBrewData?.coffeeBeanId || lastBrew?.coffeeBeanId || "");
   const [selectedBatchId, setSelectedBatchId] = useState(initialBrewData?.batchId || lastBrew?.batchId || "");
   const [selectedGrinderId, setSelectedGrinderId] = useState(initialBrewData?.grinderId || lastBrew?.grinderId || "");
@@ -133,13 +135,93 @@ export default function Brew() {
     }
   };
 
-  const handleSaveBrew = async () => {
-    if (rating === 0) {
-      toast({ title: "Please add a rating", variant: "destructive" });
+  // Save brew initially (step 3) - just the basic brew data
+  const handleSaveBrewInitial = async () => {
+    if (!yieldAmount || !brewTime) {
+      toast({ title: "Please fill in yield and brew time", variant: "destructive" });
       return;
     }
 
-    // Validate required template fields
+    const brewData = {
+      coffeeBeanId: selectedBeanId,
+      batchId: selectedBatchId,
+      grinderId: selectedGrinderId,
+      brewerId: selectedBrewerId,
+      recipeId: selectedRecipeId,
+      coffeeServerId: selectedServerId && selectedServerId !== "none" ? selectedServerId : undefined,
+      dose: parseFloat(dose),
+      grindSize: parseFloat(grindSize),
+      water: parseFloat(water),
+      yield: parseFloat(yieldAmount),
+      temperature: parseFloat(temperature),
+      brewTime,
+      rating: 0, // Default rating, will be updated in step 4
+    };
+
+    try {
+      if (isEditing && savedBrewId) {
+        // Calculate dose difference for editing
+        const oldDose = editBrew?.dose || 0;
+        const newDose = parseFloat(dose);
+        const doseDiff = newDose - oldDose;
+        
+        await updateBrew(savedBrewId, brewData);
+        
+        // Adjust batch weight if dose changed and same batch
+        if (doseDiff !== 0 && selectedBeanId && selectedBatchId) {
+          const bean = coffeeBeans.find(b => b.id === selectedBeanId);
+          if (bean) {
+            const updatedBatches = bean.batches.map(batch => 
+              batch.id === selectedBatchId 
+                ? { ...batch, currentWeight: Math.max(0, batch.currentWeight - doseDiff) }
+                : batch
+            );
+            await updateCoffeeBean(selectedBeanId, { batches: updatedBatches });
+          }
+        }
+        
+        toast({ title: "Brew saved!" });
+        setStep(4);
+      } else {
+        const newBrew = await addBrew({
+          date: new Date().toISOString(),
+          ...brewData,
+        });
+        setSavedBrewId(newBrew.id);
+        
+        // Deduct dose from batch currentWeight
+        if (selectedBeanId && selectedBatchId) {
+          const bean = coffeeBeans.find(b => b.id === selectedBeanId);
+          if (bean) {
+            const updatedBatches = bean.batches.map(batch => 
+              batch.id === selectedBatchId 
+                ? { ...batch, currentWeight: Math.max(0, batch.currentWeight - parseFloat(dose)) }
+                : batch
+            );
+            await updateCoffeeBean(selectedBeanId, { batches: updatedBatches });
+          }
+        }
+        
+        toast({ title: "Brew saved!" });
+        setStep(4);
+      }
+    } catch (error) {
+      toast({ 
+        title: "Failed to save brew", 
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive" 
+      });
+    }
+  };
+
+  // Update brew with evaluation data (step 4)
+  const handleSaveEvaluation = async () => {
+    if (!savedBrewId) {
+      toast({ title: "No brew to update", variant: "destructive" });
+      return;
+    }
+
+    // Validate required template fields if template selected
     if (selectedTemplate) {
       const requiredFields = selectedTemplate.fields.filter(f => f.required);
       const missingFields = requiredFields.filter(f => !templateNotes[f.id]);
@@ -155,24 +237,12 @@ export default function Brew() {
 
     const extractionYield = calculateEY();
     
-    const brewData = {
-      coffeeBeanId: selectedBeanId,
-      batchId: selectedBatchId,
-      grinderId: selectedGrinderId,
-      brewerId: selectedBrewerId,
-      recipeId: selectedRecipeId,
-      coffeeServerId: selectedServerId && selectedServerId !== "none" ? selectedServerId : undefined,
-      dose: parseFloat(dose),
-      grindSize: parseFloat(grindSize),
-      water: parseFloat(water),
-      yield: parseFloat(yieldAmount),
-      temperature: parseFloat(temperature),
-      brewTime,
+    const evaluationData = {
       tds: tds ? parseFloat(tds) : undefined,
       extractionYield: extractionYield ? parseFloat(extractionYield) : undefined,
-      rating,
-      comment,
-      photo,
+      rating: rating || undefined,
+      comment: comment || undefined,
+      photo: photo || undefined,
       ...(selectedTemplateId && {
         templateNotes: {
           templateId: selectedTemplateId,
@@ -182,58 +252,21 @@ export default function Brew() {
     };
 
     try {
-      if (isEditing && editBrew?.id) {
-        // Calculate dose difference for editing
-        const oldDose = editBrew.dose || 0;
-        const newDose = parseFloat(dose);
-        const doseDiff = newDose - oldDose;
-        
-        await updateBrew(editBrew.id, brewData);
-        
-        // Adjust batch weight if dose changed and same batch
-        if (doseDiff !== 0 && selectedBeanId && selectedBatchId) {
-          const bean = coffeeBeans.find(b => b.id === selectedBeanId);
-          if (bean) {
-            const updatedBatches = bean.batches.map(batch => 
-              batch.id === selectedBatchId 
-                ? { ...batch, currentWeight: Math.max(0, batch.currentWeight - doseDiff) }
-                : batch
-            );
-            await updateCoffeeBean(selectedBeanId, { batches: updatedBatches });
-          }
-        }
-        
-        toast({ title: "Brew updated successfully!" });
-        navigate("/history");
-      } else {
-        await addBrew({
-          date: new Date().toISOString(),
-          ...brewData,
-        });
-        
-        // Deduct dose from batch currentWeight
-        if (selectedBeanId && selectedBatchId) {
-          const bean = coffeeBeans.find(b => b.id === selectedBeanId);
-          if (bean) {
-            const updatedBatches = bean.batches.map(batch => 
-              batch.id === selectedBatchId 
-                ? { ...batch, currentWeight: Math.max(0, batch.currentWeight - parseFloat(dose)) }
-                : batch
-            );
-            await updateCoffeeBean(selectedBeanId, { batches: updatedBatches });
-          }
-        }
-        
-        toast({ title: "Brew logged successfully!" });
-        navigate("/");
-      }
+      await updateBrew(savedBrewId, evaluationData);
+      toast({ title: "Brew evaluation saved!" });
+      navigate(isEditing ? "/history" : "/");
     } catch (error) {
       toast({ 
-        title: "Failed to save brew", 
+        title: "Failed to save evaluation", 
         description: error instanceof Error ? error.message : "An error occurred",
         variant: "destructive" 
       });
     }
+  };
+
+  const handleSkipEvaluation = () => {
+    toast({ title: "Brew logged!" });
+    navigate(isEditing ? "/history" : "/");
   };
 
   // When recipe is selected, pre-fill brew parameters
@@ -274,7 +307,7 @@ export default function Brew() {
                 <span className="text-xs">Brew Timer</span>
               </Button>
             )}
-            <CardDescription>Step {step} of 3</CardDescription>
+            <CardDescription>Step {step} of {totalSteps}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Step 1: Select All Equipment & Recipe */}
@@ -600,34 +633,12 @@ export default function Brew() {
               </div>
             )}
 
-            {/* Step 3: Post-Brew Analysis */}
+            {/* Step 3: Brew Results (Yield & Time) */}
             {step === 3 && (
               <div className="space-y-4 animate-fade-in">
                 <p className="text-sm text-muted-foreground mb-4">
                   Record your brew results
                 </p>
-
-                <div>
-                  <Label>Rating</Label>
-                  <div className="flex gap-2 mt-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() => setRating(star)}
-                        className="transition-transform hover:scale-110"
-                      >
-                        <Star
-                          className={`h-8 w-8 ${
-                            star <= rating
-                              ? "fill-golden text-golden"
-                              : "text-muted-foreground"
-                          }`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
                 {selectedServer && selectedServer.emptyWeight && selectedServer.emptyWeight > 0 && (
                   <div className="p-3 rounded-md bg-muted/50 space-y-3">
@@ -692,7 +703,18 @@ export default function Brew() {
                       placeholder="e.g., 2:30"
                     />
                   </div>
+                </div>
+              </div>
+            )}
 
+            {/* Step 4: Brew Evaluation (Optional) */}
+            {step === 4 && (
+              <div className="space-y-4 animate-fade-in">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Add evaluation (optional)
+                </p>
+
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="tds">TDS (%) - Optional</Label>
                     <Input
@@ -710,6 +732,28 @@ export default function Brew() {
                     <div className="h-10 flex items-center px-3 rounded-md border border-input bg-muted">
                       {calculateEY() ? `${calculateEY()}%` : "-"}
                     </div>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Rating</Label>
+                  <div className="flex gap-2 mt-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => setRating(star)}
+                        className="transition-transform hover:scale-110"
+                      >
+                        <Star
+                          className={`h-8 w-8 ${
+                            star <= rating
+                              ? "fill-golden text-golden"
+                              : "text-muted-foreground"
+                          }`}
+                        />
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -850,9 +894,19 @@ export default function Brew() {
                 </Button>
               )}
               {step === 3 && (
-                <Button onClick={handleSaveBrew} className="flex-1">
-                  {isEditing ? "Update Brew" : "Save Brew"}
+                <Button onClick={handleSaveBrewInitial} className="flex-1">
+                  Save & Continue
                 </Button>
+              )}
+              {step === 4 && (
+                <div className="flex gap-2 w-full">
+                  <Button variant="outline" onClick={handleSkipEvaluation} className="flex-1">
+                    Skip
+                  </Button>
+                  <Button onClick={handleSaveEvaluation} className="flex-1">
+                    Save Evaluation
+                  </Button>
+                </div>
               )}
             </div>
           </CardContent>

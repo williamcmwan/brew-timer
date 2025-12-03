@@ -5,14 +5,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ArrowLeft, Coffee, Droplet, BookOpen, Bean, FileText, GlassWater, ChevronRight, ChevronDown, Key } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Coffee, Droplet, BookOpen, Bean, FileText, GlassWater, ChevronRight, ChevronDown, Key, Coins } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrency } from "@/hooks/use-currency";
 
 export default function Settings() {
   const navigate = useNavigate();
   const { user, changePassword } = useApp();
   const { toast } = useToast();
+  const { currency, setCurrency, currencies } = useCurrency();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -76,6 +79,30 @@ export default function Settings() {
             </button>
           ))}
         </div>
+
+        <Card className="mt-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <Coins className="h-5 w-5" />
+              Currency
+            </CardTitle>
+            <CardDescription>Set your preferred currency for prices</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(currencies).map(([code, config]) => (
+                  <SelectItem key={code} value={code}>
+                    {config.symbol} - {code}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
 
         {isEmailUser && (
           <Collapsible open={isPasswordSectionOpen} onOpenChange={setIsPasswordSectionOpen}>

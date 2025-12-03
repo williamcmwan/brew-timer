@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useCurrency } from "@/hooks/use-currency";
 import { Plus, Trash2, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
 import type { CoffeeBean, CoffeeBatch } from "@/contexts/AppContext";
 import { CoffeeBagScanner } from "./CoffeeBagScanner";
@@ -48,6 +49,7 @@ interface PendingBatchAdd {
 export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }: CoffeeBeanDialogProps) {
   const { addCoffeeBean, updateCoffeeBean, coffeeBeans } = useApp();
   const { toast } = useToast();
+  const { symbol } = useCurrency();
   const [batches, setBatches] = useState<CoffeeBatch[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [pendingBatchAdd, setPendingBatchAdd] = useState<PendingBatchAdd | null>(null);
@@ -420,7 +422,7 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
                 <div className="flex-1 space-y-2">
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <Label className="text-xs">Price ($)</Label>
+                      <Label className="text-xs">Price ({symbol})</Label>
                       <Input
                         type="number"
                         placeholder="Price"
@@ -531,7 +533,7 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Price ($)</Label>
+                  <Label className="text-xs">Price ({symbol})</Label>
                   <Input
                     type="number"
                     value={pendingBatchAdd.batch.price === 0 ? "" : pendingBatchAdd.batch.price}

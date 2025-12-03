@@ -217,4 +217,11 @@ export const api = {
         body: JSON.stringify({ images }),
       }),
   },
+  
+  admin: {
+    getGrinders: () => request<any[]>('/admin/grinders'),
+    getBrewers: () => request<any[]>('/admin/brewers'),
+    getCoffeeServers: () => request<any[]>('/admin/coffee-servers'),
+    getRecipes: () => request<any[]>('/admin/recipes'),
+  },
 };

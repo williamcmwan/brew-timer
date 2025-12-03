@@ -155,7 +155,7 @@ interface AppContextType {
   deleteCoffeeBean: (id: string) => Promise<void>;
   toggleCoffeeBeanFavorite: (id: string) => Promise<void>;
   brews: Brew[];
-  addBrew: (brew: Omit<Brew, "id">) => Promise<void>;
+  addBrew: (brew: Omit<Brew, "id">) => Promise<Brew>;
   updateBrew: (id: string, brew: Partial<Brew>) => Promise<void>;
   deleteBrew: (id: string) => Promise<void>;
   toggleBrewFavorite: (id: string) => Promise<void>;
@@ -349,9 +349,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCoffeeBeans(prev => prev.map(b => b.id === id ? { ...b, favorite: !b.favorite } : b));
   };
 
-  const addBrew = async (brew: Omit<Brew, "id">) => {
+  const addBrew = async (brew: Omit<Brew, "id">): Promise<Brew> => {
     const newBrew = await api.brews.create(brew);
     setBrews(prev => [newBrew, ...prev]);
+    return newBrew;
   };
 
   const updateBrew = async (id: string, brew: Partial<Brew>) => {

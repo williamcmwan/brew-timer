@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useCurrency } from "@/hooks/use-currency";
 import { 
   ArrowLeft, 
   Package, 
@@ -33,6 +34,7 @@ export default function Inventory() {
   const { coffeeBeans, updateCoffeeBean } = useApp();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { format: formatCurrency } = useCurrency();
   const [selectedBean, setSelectedBean] = useState<CoffeeBean | null>(null);
   const [editingBatch, setEditingBatch] = useState<CoffeeBatch | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -252,7 +254,7 @@ export default function Inventory() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold">${inventoryStats.totalValue.toFixed(2)}</div>
+              <div className="text-3xl font-bold">{formatCurrency(inventoryStats.totalValue)}</div>
               <p className="text-xs text-muted-foreground">Current stock value</p>
             </CardContent>
           </Card>
@@ -349,11 +351,11 @@ export default function Inventory() {
                                     </div>
                                     <div className="flex items-center gap-1">
                                       <DollarSign className="h-3 w-3" />
-                                      ${batch.price.toFixed(2)}
+                                      {formatCurrency(batch.price)}
                                     </div>
                                     <div className="flex items-center gap-1">
                                       <TrendingDown className="h-3 w-3" />
-                                      ${(batch.price / batch.weight * 1000).toFixed(2)}/kg
+                                      {formatCurrency(batch.price / batch.weight * 1000)}/kg
                                     </div>
                                   </div>
                                   {batch.notes && (

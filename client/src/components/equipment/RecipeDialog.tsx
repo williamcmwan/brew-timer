@@ -9,9 +9,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Copy } from "lucide-react";
 import type { Recipe, RecipeStep } from "@/contexts/AppContext";
 import ImageUpload from "@/components/ImageUpload";
+import { api } from "@/lib/api";
+
+interface AdminRecipe {
+  id: string;
+  name: string;
+  ratio: string;
+  dose: number;
+  photo?: string;
+  process?: string;
+  processSteps?: RecipeStep[];
+  grindSize: number;
+  water: number;
+  yield: number;
+  temperature: number;
+  brewTime: string;
+  grinderModel?: string;
+  brewerModel?: string;
+}
 
 const recipeSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
@@ -65,6 +83,14 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
   ]);
   // Track raw elapsed time input values to allow free editing
   const [elapsedTimeInputs, setElapsedTimeInputs] = useState<Record<number, string>>({});
+  const [adminRecipes, setAdminRecipes] = useState<AdminRecipe[]>([]);
+  const [showAdminPicker, setShowAdminPicker] = useState(false);
+
+  useEffect(() => {
+    if (open && !recipe && !isCloning) {
+      api.admin.getRecipes().then(setAdminRecipes).catch(() => setAdminRecipes([]));
+    }
+  }, [open, recipe, isCloning]);
 
   const {
     register,
@@ -183,6 +209,34 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
     setProcessSteps(newSteps);
   };
 
+  const handleCopyFromAdmin = (adminRecipe: AdminRecipe) => {
+    setValue("name", adminRecipe.name);
+    setValue("ratio", adminRecipe.ratio);
+    setValue("dose", adminRecipe.dose);
+    setValue("photo", adminRecipe.photo || "");
+    setValue("process", adminRecipe.process || "");
+    setValue("grindSize", adminRecipe.grindSize);
+    setValue("water", adminRecipe.water);
+    setValue("yield", adminRecipe.yield);
+    setValue("temperature", adminRecipe.temperature);
+    setValue("brewTime", adminRecipe.brewTime);
+    
+    if (adminRecipe.processSteps && adminRecipe.processSteps.length > 0) {
+      setProcessSteps([...adminRecipe.processSteps]);
+      const inputs: Record<number, string> = {};
+      adminRecipe.processSteps.forEach((step, index) => {
+        inputs[index] = formatDuration(step.duration);
+      });
+      setElapsedTimeInputs(inputs);
+    }
+    
+    setShowAdminPicker(false);
+    toast({ 
+      title: "Copied", 
+      description: `Copied "${adminRecipe.name}" settings. Please select your grinder and brewer.` 
+    });
+  };
+
   if (grinders.length === 0 || brewers.length === 0) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -210,6 +264,48 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
           <DialogTitle>{isCloning ? "Clone Recipe" : recipe ? "Edit Recipe" : "Add Recipe"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {!recipe && !isCloning && adminRecipes.length > 0 && (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowAdminPicker(!showAdminPicker)}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy from templates
+              </Button>
+              {showAdminPicker && (
+                <div className="border rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto bg-muted/50">
+                  {adminRecipes.map((ar) => (
+                    <Button
+                      key={ar.id}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-left h-auto py-2"
+                      onClick={() => handleCopyFromAdmin(ar)}
+                    >
+                      <div className="flex items-center gap-2 w-full">
+                        {ar.photo ? (
+                          <img src={ar.photo} alt={ar.name} className="w-8 h-8 rounded object-cover shrink-0" />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground shrink-0">—</div>
+                        )}
+                        <div className="truncate">
+                          {ar.name}
+                          <span className="text-xs text-muted-foreground ml-2">
+                            ({ar.brewerModel || "Unknown brewer"})
+                          </span>
+                        </div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="name">Name *</Label>
             <Input id="name" {...register("name")} placeholder="e.g., Morning V60" />

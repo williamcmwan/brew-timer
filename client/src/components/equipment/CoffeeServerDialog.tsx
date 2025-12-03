@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { Copy } from "lucide-react";
 import type { CoffeeServer } from "@/contexts/AppContext";
 import ImageUpload from "@/components/ImageUpload";
+import { api } from "@/lib/api";
 
 const serverSchema = z.object({
   model: z.string().trim().min(1, "Model is required").max(100),
@@ -29,6 +31,14 @@ interface CoffeeServerDialogProps {
 export function CoffeeServerDialog({ open, onOpenChange, server }: CoffeeServerDialogProps) {
   const { addCoffeeServer, updateCoffeeServer } = useApp();
   const { toast } = useToast();
+  const [adminServers, setAdminServers] = useState<CoffeeServer[]>([]);
+  const [showAdminPicker, setShowAdminPicker] = useState(false);
+
+  useEffect(() => {
+    if (open && !server) {
+      api.admin.getCoffeeServers().then(setAdminServers).catch(() => setAdminServers([]));
+    }
+  }, [open, server]);
 
   const {
     register,
@@ -87,6 +97,15 @@ export function CoffeeServerDialog({ open, onOpenChange, server }: CoffeeServerD
     }
   };
 
+  const handleCopyFromAdmin = (adminServer: CoffeeServer) => {
+    setValue("model", adminServer.model);
+    setValue("photo", adminServer.photo || "");
+    setValue("maxVolume", adminServer.maxVolume || "");
+    setValue("emptyWeight", adminServer.emptyWeight || "");
+    setShowAdminPicker(false);
+    toast({ title: "Copied", description: `Copied "${adminServer.model}" settings` });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -94,6 +113,43 @@ export function CoffeeServerDialog({ open, onOpenChange, server }: CoffeeServerD
           <DialogTitle>{server ? "Edit Coffee Server" : "Add Coffee Server"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {!server && adminServers.length > 0 && (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setShowAdminPicker(!showAdminPicker)}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Copy from templates
+              </Button>
+              {showAdminPicker && (
+                <div className="border rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto bg-muted/50">
+                  {adminServers.map((as) => (
+                    <Button
+                      key={as.id}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start text-left h-auto py-2"
+                      onClick={() => handleCopyFromAdmin(as)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {as.photo ? (
+                          <img src={as.photo} alt={as.model} className="w-8 h-8 rounded object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground">—</div>
+                        )}
+                        <span className="truncate">{as.model} {as.maxVolume ? `(${as.maxVolume}ml)` : ""}</span>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="model">Model *</Label>
             <Input id="model" {...register("model")} placeholder="e.g., Hario V60 Range Server" />

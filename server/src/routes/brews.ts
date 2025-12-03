@@ -111,12 +111,42 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
     return res.status(400).json({ error: result.error.issues[0]?.message || "Invalid input" });
   }
   
-  const { coffeeBeanId, batchId, grinderId, brewerId, recipeId, coffeeServerId, dose, grindSize,
-          water, yield: yieldVal, temperature, brewTime, tds, extractionYield,
-          rating, comment, photo, favorite, templateNotes } = result.data;
+  // Get existing brew first
+  const existing = db.prepare(`
+    SELECT * FROM brews WHERE id = ? AND user_id = ?
+  `).get(id, userId) as BrewRow | undefined;
+  
+  if (!existing) {
+    return res.status(404).json({ error: "Brew not found" });
+  }
+  
+  const data = result.data;
   
   // Convert empty strings to null for foreign key fields
-  const toNullableId = (id: any) => (id && id !== '' && id !== 'none') ? id : null;
+  const toNullableId = (val: any) => (val && val !== '' && val !== 'none') ? val : null;
+  
+  // Merge with existing data - only update fields that are explicitly provided
+  const coffeeBeanId = data.coffeeBeanId !== undefined ? toNullableId(data.coffeeBeanId) : existing.coffee_bean_id;
+  const batchId = data.batchId !== undefined ? toNullableId(data.batchId) : existing.batch_id;
+  const grinderId = data.grinderId !== undefined ? toNullableId(data.grinderId) : existing.grinder_id;
+  const brewerId = data.brewerId !== undefined ? toNullableId(data.brewerId) : existing.brewer_id;
+  const recipeId = data.recipeId !== undefined ? toNullableId(data.recipeId) : existing.recipe_id;
+  const coffeeServerId = data.coffeeServerId !== undefined ? toNullableId(data.coffeeServerId) : existing.coffee_server_id;
+  const dose = data.dose !== undefined ? data.dose : existing.dose;
+  const grindSize = data.grindSize !== undefined ? data.grindSize : existing.grind_size;
+  const water = data.water !== undefined ? data.water : existing.water;
+  const yieldVal = data.yield !== undefined ? data.yield : existing.yield;
+  const temperature = data.temperature !== undefined ? data.temperature : existing.temperature;
+  const brewTime = data.brewTime !== undefined ? data.brewTime : existing.brew_time;
+  const tds = data.tds !== undefined ? data.tds : existing.tds;
+  const extractionYield = data.extractionYield !== undefined ? data.extractionYield : existing.extraction_yield;
+  const rating = data.rating !== undefined ? data.rating : existing.rating;
+  const comment = data.comment !== undefined ? data.comment : existing.comment;
+  const photo = data.photo !== undefined ? (data.photo || null) : existing.photo;
+  const favorite = data.favorite !== undefined ? (data.favorite ? 1 : 0) : existing.favorite;
+  const templateNotes = data.templateNotes !== undefined 
+    ? (data.templateNotes ? JSON.stringify(data.templateNotes) : null) 
+    : existing.template_notes;
   
   db.prepare(`
     UPDATE brews SET coffee_bean_id = ?, batch_id = ?, grinder_id = ?, brewer_id = ?, 
@@ -124,10 +154,9 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
            brew_time = ?, tds = ?, extraction_yield = ?, rating = ?, comment = ?, 
            photo = ?, favorite = ?, template_notes = ?
     WHERE id = ? AND user_id = ?
-  `).run(toNullableId(coffeeBeanId), toNullableId(batchId), toNullableId(grinderId), toNullableId(brewerId),
-         toNullableId(recipeId), toNullableId(coffeeServerId), dose, grindSize, water, yieldVal, temperature, brewTime,
-         tds, extractionYield, rating, comment, photo || null, favorite ? 1 : 0,
-         templateNotes ? JSON.stringify(templateNotes) : null, id, userId);
+  `).run(coffeeBeanId, batchId, grinderId, brewerId, recipeId, coffeeServerId, 
+         dose, grindSize, water, yieldVal, temperature, brewTime,
+         tds, extractionYield, rating, comment, photo, favorite, templateNotes, id, userId);
   
   res.json({ success: true });
 });

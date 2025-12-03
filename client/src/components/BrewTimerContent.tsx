@@ -344,13 +344,13 @@ export default function BrewTimerContent({
 
         {/* Current Step */}
         <div className="space-y-3 py-4">
-          <div className="flex items-center gap-3 justify-center">
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary text-lg font-bold flex-shrink-0">
+          <div className="flex items-center gap-4 justify-center">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary text-xl font-bold flex-shrink-0">
               {currentStepIndex + 1}
             </div>
             <div className="text-left">
-              <h3 className="text-xl font-bold leading-tight">{currentStep?.title}</h3>
-              <p className="text-sm text-muted-foreground leading-tight mt-0.5">{currentStep?.description}</p>
+              <h3 className="text-2xl font-bold leading-tight">{currentStep?.title}</h3>
+              <p className="text-lg text-muted-foreground leading-snug mt-1">{currentStep?.description}</p>
             </div>
           </div>
           
@@ -437,8 +437,8 @@ export default function BrewTimerContent({
         </div>
 
         {/* Timeline */}
-        <div className="border-t pt-2">
-          <h4 className="font-semibold text-xs text-muted-foreground mb-2">Timeline</h4>
+        <div className="border-t pt-4">
+          <h4 className="font-semibold text-sm text-muted-foreground mb-3">Timeline</h4>
           <div className="relative">
             {steps.map((step, index) => {
               // Calculate elapsed time at the start of this step
@@ -446,36 +446,36 @@ export default function BrewTimerContent({
               const isLast = index === steps.length - 1;
               
               return (
-                <div key={index} className="flex gap-2">
+                <div key={index} className="flex gap-3">
                   {/* Timeline column */}
                   <div className="flex flex-col items-center">
                     {/* Time marker */}
-                    <div className={`text-xs font-mono w-10 text-right ${
-                      index <= currentStepIndex ? 'text-primary font-semibold' : 'text-muted-foreground'
+                    <div className={`text-base font-mono w-14 text-right ${
+                      index <= currentStepIndex ? 'text-primary font-bold' : 'text-muted-foreground'
                     }`}>
                       {formatTime(stepStartTime)}
                     </div>
                     {/* Dot */}
-                    <div className={`w-2.5 h-2.5 rounded-full mt-0.5 ${
+                    <div className={`w-3 h-3 rounded-full mt-1 ${
                       index < currentStepIndex ? 'bg-primary' :
                       index === currentStepIndex ? 'bg-primary ring-2 ring-primary/20' :
                       'bg-muted-foreground/30'
                     }`} />
                     {/* Line */}
                     {!isLast && (
-                      <div className={`w-0.5 flex-1 min-h-5 ${
+                      <div className={`w-0.5 flex-1 min-h-8 ${
                         index < currentStepIndex ? 'bg-primary' : 'bg-muted-foreground/20'
                       }`} />
                     )}
                   </div>
                   {/* Content */}
-                  <div className={`flex-1 pb-2 ${index < currentStepIndex ? 'opacity-60' : ''}`}>
-                    <div className={`font-medium text-sm leading-tight ${
+                  <div className={`flex-1 pb-4 ${index < currentStepIndex ? 'opacity-60' : ''}`}>
+                    <div className={`font-semibold text-lg leading-tight ${
                       index === currentStepIndex ? 'text-primary' : ''
                     }`}>
                       {step.title}
                     </div>
-                    <div className="text-xs text-muted-foreground leading-tight">
+                    <div className="text-base text-muted-foreground leading-snug mt-1">
                       {step.description}
                     </div>
                   </div>

@@ -21,6 +21,7 @@ import brewTemplatesRoutes from './routes/brewTemplates.js';
 import uploadsRoutes from './routes/uploads.js';
 import coffeeServersRoutes from './routes/coffeeServers.js';
 import aiRoutes from './routes/ai.js';
+import adminRoutes from './routes/admin.js';
 import { authMiddleware } from './middleware/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -142,6 +143,7 @@ app.use('/api/brew-templates', authMiddleware, brewTemplatesRoutes);
 app.use('/api/uploads', authMiddleware, uploadsRoutes);
 app.use('/api/coffee-servers', authMiddleware, coffeeServersRoutes);
 app.use('/api/ai', authMiddleware, aiRoutes);
+app.use('/api/admin', authMiddleware, adminRoutes);
 
 // Serve uploaded images from user-specific folders
 // Path format: /uploads/{user_folder}/{filename}

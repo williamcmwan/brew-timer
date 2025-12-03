@@ -164,13 +164,15 @@ The client dev server runs on port 5173 and proxies API requests to the server o
 - **AI Coffee Bag Scanner**: Take photos of coffee bags (front/back) to auto-fill bean information using Gemini AI
 - **Recipes**: Create and save recipes with process steps for guided brewing
 - **Equipment**: Track grinders, brewers, and coffee servers with photo uploads
+- **Equipment Templates**: Copy equipment and recipes from admin templates when adding new items
 - **Coffee Servers**: Manage servers with empty weight for automatic yield calculation
 - **Brew History**: View, edit, and delete past brews with filtering and sorting
 - **Analytics**: View brewing statistics and trends
 - **Brew Comparison**: Compare multiple brews side by side
 - **Brew Timer**: Timer with recipe steps, countdown sounds, flow rate display, and water tracking
 - **Custom Templates**: Create custom brew note templates for consistent observations
-- **Inventory Management**: Track coffee stock with low stock alerts
+- **Inventory Management**: Track coffee stock with low stock alerts and multi-currency support
+- **Currency Settings**: Choose from 24+ currencies with auto-detection based on locale
 - **Export**: Export brew history to CSV or PDF
 - **Share**: Share brew details via native share or clipboard
 
