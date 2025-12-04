@@ -297,17 +297,7 @@ export default function Brew() {
               <Coffee className="h-6 w-6" />
               {isEditing ? "Edit Brew" : "New Brew"}
             </CardTitle>
-            {step === 2 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setTimerDialogOpen(true)}
-                className="absolute top-4 right-4 flex flex-col items-center gap-1 h-auto py-2 px-3"
-              >
-                <Clock className="h-6 w-6" />
-                <span className="text-xs">Brew Timer</span>
-              </Button>
-            )}
+
             <CardDescription>Step {step} of {totalSteps}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -559,7 +549,18 @@ export default function Brew() {
 
                 {selectedRecipe?.processSteps && selectedRecipe.processSteps.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Timeline</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Timeline</Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTimerDialogOpen(true)}
+                        className="flex items-center gap-1.5 h-8 px-3 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                      >
+                        <Clock className="h-4 w-4" />
+                        <span className="text-sm font-medium">Start Timer</span>
+                      </Button>
+                    </div>
                     <div className="relative">
                       {(() => {
                         const formatTime = (seconds: number) => {
@@ -649,11 +650,34 @@ export default function Brew() {
                 
                 {selectedRecipe?.process && !selectedRecipe.processSteps && (
                   <div className="space-y-2">
-                    <Label>Process</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Process</Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setTimerDialogOpen(true)}
+                        className="flex items-center gap-1.5 h-8 px-3 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                      >
+                        <Clock className="h-4 w-4" />
+                        <span className="text-sm font-medium">Start Timer</span>
+                      </Button>
+                    </div>
                     <div className="p-3 rounded-md bg-muted/50 text-sm">
                       {selectedRecipe.process}
                     </div>
                   </div>
+                )}
+
+                {/* Timer button when no timeline/process is shown */}
+                {(!selectedRecipe?.processSteps || selectedRecipe.processSteps.length === 0) && !selectedRecipe?.process && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setTimerDialogOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 h-10 border-primary/50 text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                  >
+                    <Clock className="h-4 w-4" />
+                    <span className="font-medium">Start Brew Timer</span>
+                  </Button>
                 )}
               </div>
             )}
