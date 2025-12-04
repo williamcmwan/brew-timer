@@ -94,6 +94,12 @@ export default function BrewHistory() {
     return server ? server.model : null;
   };
 
+  const getBrewThumbnail = (brew: typeof brews[0]) => {
+    if (brew.photo) return brew.photo;
+    const bean = coffeeBeans.find(b => b.id === brew.coffeeBeanId);
+    return bean?.photo || null;
+  };
+
   // Filter and sort brews
   const filteredAndSortedBrews = useMemo(() => {
     let filtered = [...brews];
@@ -361,41 +367,73 @@ export default function BrewHistory() {
                     <Card className="overflow-hidden hover:shadow-md transition-shadow">
                       <CollapsibleTrigger className="w-full">
                         <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors">
-                          <div className="text-left">
-                            <CardTitle className="text-lg mb-1">
-                              {getBeanName(brew.coffeeBeanId)}
-                              {(() => {
-                                const days = getDaysAfterRoast(brew.batchId, brew.coffeeBeanId, brew.date);
-                                return days !== null ? (
-                                  <span className="text-xs text-muted-foreground font-normal ml-2">
-                                    (roasted {days}d)
-                                  </span>
-                                ) : null;
-                              })()}
-                            </CardTitle>
-                            <div className="flex flex-wrap gap-2">
-                              {brew.extractionYield != null && (
-                                <Badge variant="secondary" className="flex items-center gap-1">
-                                  <TrendingUp className="h-3 w-3" />
-                                  EY: {brew.extractionYield.toFixed(2)}%
-                                </Badge>
-                              )}
-                              {brew.tds != null && (
-                                <Badge variant="outline">
-                                  TDS: {brew.tds.toFixed(2)}%
-                                </Badge>
-                              )}
+                          <div className="flex gap-3">
+                            {/* Thumbnail with roast days */}
+                            {getBrewThumbnail(brew) && (
+                              <div className="shrink-0 flex flex-col items-center">
+                                <img
+                                  src={getBrewThumbnail(brew)!}
+                                  alt=""
+                                  className="w-14 h-14 sm:w-16 sm:h-16 object-cover rounded-lg border border-espresso/20"
+                                />
+                                {(() => {
+                                  const days = getDaysAfterRoast(brew.batchId, brew.coffeeBeanId, brew.date);
+                                  return days !== null ? (
+                                    <span className="text-[10px] text-muted-foreground mt-1">
+                                      {days}d roasted
+                                    </span>
+                                  ) : null;
+                                })()}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0 text-left">
+                              <CardTitle className="text-base mb-1 line-clamp-2">
+                                {getBeanName(brew.coffeeBeanId)}
+                                {/* Show roast days inline if no thumbnail */}
+                                {!getBrewThumbnail(brew) && (() => {
+                                  const days = getDaysAfterRoast(brew.batchId, brew.coffeeBeanId, brew.date);
+                                  return days !== null ? (
+                                    <span className="text-xs text-muted-foreground font-normal ml-2">
+                                      ({days}d)
+                                    </span>
+                                  ) : null;
+                                })()}
+                              </CardTitle>
+                              <div className="flex flex-wrap gap-2">
+                                {brew.extractionYield != null && (
+                                  <Badge variant="secondary" className="flex items-center gap-1">
+                                    <TrendingUp className="h-3 w-3" />
+                                    EY: {brew.extractionYield.toFixed(2)}%
+                                  </Badge>
+                                )}
+                                {brew.tds != null && (
+                                  <Badge variant="outline">
+                                    TDS: {brew.tds.toFixed(2)}%
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center justify-between mt-3">
-                            <div className="flex items-center gap-4">
-                              <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <div className="flex items-center justify-between mt-3 gap-2">
+                            <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                              <span className="flex items-center gap-1 text-sm text-muted-foreground shrink-0">
                                 <Calendar className="h-4 w-4" />
                                 {new Date(brew.date).toLocaleDateString()}
                               </span>
-                              {renderStars(brew.rating)}
+                              <div className="hidden xs:block">{renderStars(brew.rating)}</div>
                             </div>
-                            <div className="flex items-center gap-0">
+                            <div className="flex items-center shrink-0">
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleBrewFavorite(brew.id);
+                                }}
+                              >
+                                <Star className={`h-4 w-4 ${brew.favorite ? "fill-golden text-golden" : ""}`} />
+                              </Button>
                               <ShareButton
                                 title={`Coffee Brew - ${getBeanName(brew.coffeeBeanId)}`}
                                 text={generateBrewShareText(
@@ -408,16 +446,6 @@ export default function BrewHistory() {
                                 size="icon"
                                 variant="ghost"
                               />
-                              <Button 
-                                variant="ghost" 
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleBrewFavorite(brew.id);
-                                }}
-                              >
-                                <Star className={`h-4 w-4 ${brew.favorite ? "fill-golden text-golden" : ""}`} />
-                              </Button>
                             </div>
                           </div>
                         </CardHeader>
@@ -427,6 +455,37 @@ export default function BrewHistory() {
                         <CardContent className="pt-0">
                           <Separator className="mb-4" />
                           
+                          {/* Edit/Delete Actions - Mobile: top right, Desktop: inline */}
+                          <div className="flex justify-end mb-2 md:hidden">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => navigate('/brew', { state: { editBrew: brew, step: 4 } })}
+                              title="Evaluate brew"
+                            >
+                              <ClipboardCheck className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => navigate('/brew', { state: { editBrew: brew } })}
+                              title="Edit brew"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => setDeleteId(brew.id)}
+                              title="Delete brew"
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+
                           {/* Equipment Section */}
                           <div className="flex gap-4 mb-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
@@ -486,8 +545,8 @@ export default function BrewHistory() {
                               </div>
                             </div>
                             
-                            {/* Edit/Delete Actions */}
-                            <div className="flex items-start gap-1 shrink-0">
+                            {/* Edit/Delete Actions - Desktop only */}
+                            <div className="hidden md:flex items-start gap-1 shrink-0">
                               <Button 
                                 variant="ghost" 
                                 size="icon"
