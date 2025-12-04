@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Coffee, Droplet, BookOpen, Bean, FileText, GlassWater, ChevronRight, ChevronDown, Key, Coins } from "lucide-react";
+import { ArrowLeft, Coffee, Droplet, BookOpen, Bean, FileText, GlassWater, ChevronRight, ChevronDown, Key, Coins, HelpCircle } from "lucide-react";
 import { useApp } from "@/contexts/AppContext";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrency } from "@/hooks/use-currency";
@@ -56,11 +56,16 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
       <div className="container max-w-lg mx-auto p-4 space-y-4">
-        <div className="flex items-center gap-4 pt-4 pb-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-5 w-5" />
+        <div className="flex items-center justify-between pt-4 pb-2">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold">Equipment & Settings</h1>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/guide")} title="User Guide">
+            <HelpCircle className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-bold">Equipment & Settings</h1>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

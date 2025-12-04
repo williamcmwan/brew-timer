@@ -3,7 +3,7 @@ import { useApp } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Coffee, Settings, Plus, History, TrendingUp, GitCompare, Package, Star, Sparkles, MessageCircle, ClipboardCheck, Shield } from "lucide-react";
+import { Coffee, Settings, Plus, History, TrendingUp, GitCompare, Package, Star, Sparkles, MessageCircle, ClipboardCheck, Shield, HelpCircle } from "lucide-react";
 
 export default function Dashboard() {
   const { user, brews, coffeeBeans, recipes, grinders, brewers, logout } = useApp();
@@ -37,9 +37,11 @@ export default function Dashboard() {
                 className="h-8 w-auto"
               />
             </a>
-            <Button variant="ghost" onClick={() => navigate("/contact")} className="flex items-center gap-1">
-              <MessageCircle className="h-6 w-6" />
-              <span className="text-sm">Contact</span>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/guide")} title="User Guide">
+              <HelpCircle className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/contact")} title="Contact">
+              <MessageCircle className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -139,7 +141,13 @@ export default function Dashboard() {
             <Sparkles className="h-4 w-4 text-primary" />
             <AlertTitle className="text-primary">Welcome to Brew Journal!</AlertTitle>
             <AlertDescription className="text-sm">
-              Get started by adding your coffee beans and equipment in Settings below.
+              Get started by adding your coffee beans and equipment in Settings below.{" "}
+              <span 
+                className="text-primary font-medium cursor-pointer underline"
+                onClick={() => navigate("/guide")}
+              >
+                View the Getting Started guide
+              </span>
             </AlertDescription>
           </Alert>
         )}
