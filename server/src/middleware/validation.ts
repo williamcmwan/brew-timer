@@ -77,6 +77,7 @@ export const coffeeBeanSchema = z.object({
   url: z.string().max(1000).nullable().optional(),
   favorite: z.boolean().optional(),
   lowStockThreshold: z.number().int().positive().nullable().optional(),
+  source: z.enum(['ai', 'manual']).optional(),
   batches: z.array(z.object({
     id: z.string().optional(),
     price: z.number().min(0).optional(),

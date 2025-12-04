@@ -24,6 +24,7 @@ import Inventory from "./pages/Inventory";
 import CoffeeServers from "./pages/CoffeeServers";
 import Privacy from "./pages/Privacy";
 import Contact from "./pages/Contact";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -163,6 +164,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Contact />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <Admin />
                 </ProtectedRoute>
               }
             />

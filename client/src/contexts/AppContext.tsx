@@ -103,6 +103,7 @@ export interface CoffeeBean {
   batches: CoffeeBatch[];
   favorite?: boolean;
   lowStockThreshold?: number;
+  source?: "ai" | "manual";
 }
 
 export interface Brew {

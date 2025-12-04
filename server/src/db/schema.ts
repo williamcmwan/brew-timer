@@ -159,6 +159,15 @@ export function initializeDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+
+    CREATE TABLE IF NOT EXISTS api_usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      input_tokens INTEGER NOT NULL,
+      output_tokens INTEGER NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
   `);
 
   // Add coffee_server_id column to brews if it doesn't exist
@@ -205,5 +214,11 @@ export function initializeDatabase() {
       ALTER TABLE users_new RENAME TO users;
       PRAGMA foreign_keys=ON;
     `);
+  }
+
+  // Add source column to coffee_beans if it doesn't exist
+  const beansColumns = db.prepare("PRAGMA table_info(coffee_beans)").all() as any[];
+  if (!beansColumns.some((col: any) => col.name === 'source')) {
+    db.exec(`ALTER TABLE coffee_beans ADD COLUMN source TEXT DEFAULT 'manual'`);
   }
 }

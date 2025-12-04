@@ -224,5 +224,31 @@ export const api = {
     getCoffeeServers: () => request<any[]>('/admin/coffee-servers'),
     getRecipes: () => request<any[]>('/admin/recipes'),
     getBrewTemplates: () => request<any[]>('/admin/brew-templates'),
+    getDailyStats: () => request<{
+      daily: Array<{
+        date: string;
+        userCount: number;
+        inputTokens: number;
+        outputTokens: number;
+      }>;
+      totals: {
+        totalUsers: number;
+        totalInputTokens: number;
+        totalOutputTokens: number;
+      };
+    }>('/admin/stats/daily'),
+    getUsersByDate: (date: string) => request<Array<{
+      id: number;
+      email: string;
+      registeredAt: string;
+      beansAI: number;
+      beansManual: number;
+      grinders: number;
+      brewers: number;
+      servers: number;
+      recipes: number;
+      brewTemplates: number;
+      brewHistory: number;
+    }>>(`/admin/stats/users/${date}`),
   },
 };

@@ -94,14 +94,14 @@ router.post('/', (req: AuthRequest, res: Response) => {
   }
   
   const { photo, name, roaster, country, region, altitude, varietal, process, 
-          roastLevel, roastFor, tastingNotes, url, favorite, lowStockThreshold, batches } = result.data;
+          roastLevel, roastFor, tastingNotes, url, favorite, lowStockThreshold, batches, source } = result.data;
   
   const insertResult = db.prepare(`
     INSERT INTO coffee_beans (user_id, photo, name, roaster, country, region, altitude, 
-                              varietal, process, roast_level, roast_for, tasting_notes, url, favorite, low_stock_threshold)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              varietal, process, roast_level, roast_for, tasting_notes, url, favorite, low_stock_threshold, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(userId, photo || null, name, roaster, country, region, altitude, varietal, 
-         process, roastLevel, roastFor, tastingNotes, url || null, favorite ? 1 : 0, lowStockThreshold);
+         process, roastLevel, roastFor, tastingNotes, url || null, favorite ? 1 : 0, lowStockThreshold, source || 'manual');
   
   const beanId = insertResult.lastInsertRowid;
   const insertedBatches: any[] = [];

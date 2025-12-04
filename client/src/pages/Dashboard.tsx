@@ -3,7 +3,7 @@ import { useApp } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Coffee, Settings, Plus, History, TrendingUp, GitCompare, Package, Star, Sparkles, MessageCircle, ClipboardCheck } from "lucide-react";
+import { Coffee, Settings, Plus, History, TrendingUp, GitCompare, Package, Star, Sparkles, MessageCircle, ClipboardCheck, Shield } from "lucide-react";
 
 export default function Dashboard() {
   const { user, brews, coffeeBeans, recipes, grinders, brewers, logout } = useApp();
@@ -175,6 +175,18 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {user?.email === "admin@admin.com" && (
+          <Card className="hover:shadow-md transition-shadow cursor-pointer border-amber-500/50 bg-amber-500/5" onClick={() => navigate("/admin")}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <Shield className="h-6 w-6 text-amber-500" />
+              <div>
+                <p className="font-medium">Admin Dashboard</p>
+                <p className="text-xs text-muted-foreground">View user stats and token usage</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Button variant="outline" className="w-full" onClick={logout}>
           Sign out

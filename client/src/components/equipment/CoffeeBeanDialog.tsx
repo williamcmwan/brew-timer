@@ -64,6 +64,7 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
   const [adjustedRemaining, setAdjustedRemaining] = useState<number>(0);
   const [showEmptyBatches, setShowEmptyBatches] = useState(false);
   const [originallyEmptyBatchIds, setOriginallyEmptyBatchIds] = useState<Set<string>>(new Set());
+  const [source, setSource] = useState<'ai' | 'manual'>('manual');
 
   const {
     register,
@@ -112,10 +113,12 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
       // Track which batches were originally empty (from database)
       const emptyIds = new Set(batchesToSet.filter(b => (b.currentWeight || 0) === 0).map(b => b.id));
       setOriginallyEmptyBatchIds(emptyIds);
+      setSource('manual'); // Reset source when editing
     } else {
       reset();
       setBatches([]);
       setOriginallyEmptyBatchIds(new Set());
+      setSource('manual'); // Default to manual for new beans
     }
   }, [bean, isCloning, setValue, reset]);
 
@@ -202,6 +205,11 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
     setValue("tastingNotes", data.tastingNotes || "");
     setValue("url", data.url || "");
     
+    // Mark as AI-created when scanning
+    if (!bean) {
+      setSource('ai');
+    }
+    
     // Upload photo to server and set URL
     if (data.photo) {
       try {
@@ -277,11 +285,13 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
   };
 
   const onSubmit = async (data: CoffeeBeanFormData) => {
-    const beanData = { ...data, batches } as Omit<CoffeeBean, "id">;
+    const beanData = { ...data, batches, source } as Omit<CoffeeBean, "id">;
 
     try {
       if (bean && !isCloning) {
-        await updateCoffeeBean(bean.id, beanData);
+        // Don't change source when editing
+        const { source: _, ...updateData } = beanData as any;
+        await updateCoffeeBean(bean.id, { ...updateData, batches });
         toast({ title: "Coffee bean updated", description: "Coffee bean has been updated successfully" });
       } else {
         await addCoffeeBean(beanData);
@@ -290,6 +300,7 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
       onOpenChange(false);
       reset();
       setBatches([]);
+      setSource('manual');
     } catch (error) {
       toast({ 
         title: "Error", 
