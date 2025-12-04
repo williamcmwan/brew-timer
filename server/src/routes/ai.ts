@@ -1,4 +1,6 @@
 import { Router, Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { z } from 'zod';
 import { db } from '../db/schema.js';
 import { AuthRequest } from '../middleware/auth.js';
@@ -21,7 +23,34 @@ interface CoffeeBeanInfo {
   weight: number;
 }
 
-// Log API usage to database
+interface GeminiLogEntry {
+  timestamp: string;
+  userId?: number;
+  success: boolean;
+  inputTokens?: number;
+  outputTokens?: number;
+  error?: string;
+  extractedData?: CoffeeBeanInfo;
+}
+
+// Log file path
+const logDir = path.join(process.cwd(), 'data');
+const logFile = path.join(logDir, 'gemini-api.log');
+
+// Log to file (for detailed debugging)
+function logGeminiCall(entry: GeminiLogEntry) {
+  try {
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
+    }
+    const logLine = JSON.stringify(entry) + '\n';
+    fs.appendFileSync(logFile, logLine);
+  } catch (e) {
+    console.error('Failed to write Gemini log:', e);
+  }
+}
+
+// Log API usage to database (for admin stats)
 function logApiUsage(userId: number | undefined, inputTokens: number, outputTokens: number) {
   if (!userId) return;
   try {
@@ -42,6 +71,7 @@ const analyzeRequestSchema = z.object({
 });
 
 router.post('/analyze-coffee-bag', async (req: AuthRequest, res: Response) => {
+  const timestamp = new Date().toISOString();
   const userId = req.userId;
   
   try {
@@ -49,6 +79,7 @@ router.post('/analyze-coffee-bag', async (req: AuthRequest, res: Response) => {
     const result = analyzeRequestSchema.safeParse(req.body);
     if (!result.success) {
       const errorMessage = result.error.issues[0]?.message || 'Invalid input';
+      logGeminiCall({ timestamp, userId, success: false, error: errorMessage });
       return res.status(400).json({ error: errorMessage });
     }
     
@@ -56,6 +87,7 @@ router.post('/analyze-coffee-bag', async (req: AuthRequest, res: Response) => {
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
+      logGeminiCall({ timestamp, userId, success: false, error: 'API key not configured' });
       return res.status(500).json({ error: 'Gemini API key not configured' });
     }
 
@@ -116,6 +148,7 @@ Rules: Use "N/A" if unknown (except roastFor/roastDate/weight). roastDate from s
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Gemini API error:', errorText);
+      logGeminiCall({ timestamp, userId, success: false, error: `API error: ${response.status}` });
       return res.status(500).json({ error: 'Failed to analyze images' });
     }
 
@@ -128,6 +161,7 @@ Rules: Use "N/A" if unknown (except roastFor/roastDate/weight). roastDate from s
     // Extract the text response
     const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!textResponse) {
+      logGeminiCall({ timestamp, userId, success: false, inputTokens, outputTokens, error: 'No response text' });
       return res.status(500).json({ error: 'No response from AI' });
     }
 
@@ -150,14 +184,26 @@ Rules: Use "N/A" if unknown (except roastFor/roastDate/weight). roastDate from s
       coffeeInfo.roastFor = '';
     }
 
-    // Log successful API usage to database
+    // Log successful call to file
+    logGeminiCall({
+      timestamp,
+      userId,
+      success: true,
+      inputTokens,
+      outputTokens,
+      extractedData: coffeeInfo
+    });
+
+    // Log API usage to database for admin stats
     if (inputTokens && outputTokens) {
       logApiUsage(userId, inputTokens, outputTokens);
     }
 
     res.json(coffeeInfo);
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error analyzing coffee bag:', error);
+    logGeminiCall({ timestamp, userId, success: false, error: errorMsg });
     res.status(500).json({ error: 'Failed to analyze coffee bag images' });
   }
 });
