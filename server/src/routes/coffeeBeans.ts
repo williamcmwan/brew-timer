@@ -96,12 +96,15 @@ router.post('/', (req: AuthRequest, res: Response) => {
   const { photo, name, roaster, country, region, altitude, varietal, process, 
           roastLevel, roastFor, tastingNotes, url, favorite, lowStockThreshold, batches, source } = result.data;
   
+  // Convert empty strings to null for optional fields
+  const toNullable = (val: any) => (val === '' || val === undefined) ? null : val;
+  
   const insertResult = db.prepare(`
     INSERT INTO coffee_beans (user_id, photo, name, roaster, country, region, altitude, 
                               varietal, process, roast_level, roast_for, tasting_notes, url, favorite, low_stock_threshold, source)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(userId, photo || null, name, roaster, country, region, altitude, varietal, 
-         process, roastLevel, roastFor, tastingNotes, url || null, favorite ? 1 : 0, lowStockThreshold, source || 'manual');
+  `).run(userId, photo || null, name, toNullable(roaster), toNullable(country), toNullable(region), toNullable(altitude), toNullable(varietal), 
+         toNullable(process), toNullable(roastLevel), toNullable(roastFor), toNullable(tastingNotes), url || null, favorite ? 1 : 0, lowStockThreshold, source || 'manual');
   
   const beanId = insertResult.lastInsertRowid;
   const insertedBatches: any[] = [];
@@ -142,6 +145,9 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
   const { photo, name, roaster, country, region, altitude, varietal, process, 
           roastLevel, roastFor, tastingNotes, url, favorite, lowStockThreshold, batches } = req.body;
   
+  // Convert empty strings to null for optional fields
+  const toNullable = (val: any) => (val === '' || val === undefined) ? null : val;
+  
   // Only update bean fields if name is provided (full update)
   if (name !== undefined) {
     db.prepare(`
@@ -149,8 +155,8 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
              altitude = ?, varietal = ?, process = ?, roast_level = ?, roast_for = ?, tasting_notes = ?, 
              url = ?, favorite = ?, low_stock_threshold = ?
       WHERE id = ? AND user_id = ?
-    `).run(photo || null, name, roaster, country, region, altitude, varietal, process, 
-           roastLevel, roastFor, tastingNotes, url || null, favorite ? 1 : 0, lowStockThreshold, id, userId);
+    `).run(photo || null, name, toNullable(roaster), toNullable(country), toNullable(region), toNullable(altitude), toNullable(varietal), toNullable(process), 
+           toNullable(roastLevel), toNullable(roastFor), toNullable(tastingNotes), url || null, favorite ? 1 : 0, lowStockThreshold, id, userId);
   }
   
   // Handle batches update - update existing batches in place to preserve IDs

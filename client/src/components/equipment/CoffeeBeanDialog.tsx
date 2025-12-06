@@ -18,12 +18,12 @@ import { uploadImage } from "@/lib/imageUtils";
 
 const coffeeBeanSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
-  roaster: z.string().trim().min(1, "Roaster is required").max(100),
-  country: z.string().trim().min(1, "Country is required").max(100),
+  roaster: z.string().trim().max(100).optional().or(z.literal("")),
+  country: z.string().trim().max(100).optional().or(z.literal("")),
   region: z.string().trim().max(100).optional().or(z.literal("")),
   altitude: z.string().trim().max(50).optional().or(z.literal("")),
-  varietal: z.string().trim().min(1, "Varietal is required").max(100),
-  process: z.string().trim().min(1, "Process is required").max(100),
+  varietal: z.string().trim().max(100).optional().or(z.literal("")),
+  process: z.string().trim().max(100).optional().or(z.literal("")),
   roastLevel: z.string().trim().max(50).optional().or(z.literal("")),
   roastFor: z.enum(["pour-over", "espresso", ""]).optional(),
   tastingNotes: z.string().trim().max(500).optional().or(z.literal("")),
@@ -339,16 +339,14 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="roaster">Roaster *</Label>
+            <Label htmlFor="roaster">Roaster</Label>
             <Input id="roaster" {...register("roaster")} placeholder="e.g., Local Coffee Co." />
-            {errors.roaster && <p className="text-sm text-destructive">{errors.roaster.message}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="country">Country *</Label>
+              <Label htmlFor="country">Country</Label>
               <Input id="country" {...register("country")} placeholder="Ethiopia" />
-              {errors.country && <p className="text-sm text-destructive">{errors.country.message}</p>}
             </div>
 
             <div className="space-y-2">
@@ -364,17 +362,15 @@ export function CoffeeBeanDialog({ open, onOpenChange, bean, isCloning = false }
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="varietal">Varietal *</Label>
+              <Label htmlFor="varietal">Varietal</Label>
               <Input id="varietal" {...register("varietal")} placeholder="Heirloom" />
-              {errors.varietal && <p className="text-sm text-destructive">{errors.varietal.message}</p>}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="process">Process *</Label>
+              <Label htmlFor="process">Process</Label>
               <Input id="process" {...register("process")} placeholder="Washed" />
-              {errors.process && <p className="text-sm text-destructive">{errors.process.message}</p>}
             </div>
 
             <div className="space-y-2">

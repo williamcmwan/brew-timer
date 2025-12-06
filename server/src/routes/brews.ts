@@ -84,21 +84,29 @@ router.post('/', (req: AuthRequest, res: Response) => {
   // Convert empty strings to null for foreign key fields
   const toNullableId = (id: any) => (id && id !== '' && id !== 'none') ? id : null;
   
-  const insertResult = db.prepare(`
-    INSERT INTO brews (user_id, date, coffee_bean_id, batch_id, grinder_id, brewer_id, 
-                       recipe_id, coffee_server_id, dose, grind_size, water, yield, temperature, brew_time, 
-                       tds, extraction_yield, rating, comment, photo, favorite, template_notes)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(userId, date, toNullableId(coffeeBeanId), toNullableId(batchId), toNullableId(grinderId), 
-         toNullableId(brewerId), toNullableId(recipeId), toNullableId(coffeeServerId), dose, grindSize, water, yieldVal, temperature,
-         brewTime, tds, extractionYield, rating, comment, photo || null, favorite ? 1 : 0,
-         templateNotes ? JSON.stringify(templateNotes) : null);
-  
-  res.json({
-    id: String(insertResult.lastInsertRowid), date, coffeeBeanId, batchId, grinderId, brewerId,
-    recipeId, coffeeServerId, dose, grindSize, water, yield: yieldVal, temperature, brewTime, tds,
-    extractionYield, rating, comment, photo, favorite: Boolean(favorite), templateNotes
-  });
+  try {
+    const insertResult = db.prepare(`
+      INSERT INTO brews (user_id, date, coffee_bean_id, batch_id, grinder_id, brewer_id, 
+                         recipe_id, coffee_server_id, dose, grind_size, water, yield, temperature, brew_time, 
+                         tds, extraction_yield, rating, comment, photo, favorite, template_notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(userId, date, toNullableId(coffeeBeanId), toNullableId(batchId), toNullableId(grinderId), 
+           toNullableId(brewerId), toNullableId(recipeId), toNullableId(coffeeServerId), dose, grindSize, water, yieldVal, temperature,
+           brewTime, tds, extractionYield, rating, comment, photo || null, favorite ? 1 : 0,
+           templateNotes ? JSON.stringify(templateNotes) : null);
+    
+    res.json({
+      id: String(insertResult.lastInsertRowid), date, coffeeBeanId, batchId, grinderId, brewerId,
+      recipeId, coffeeServerId, dose, grindSize, water, yield: yieldVal, temperature, brewTime, tds,
+      extractionYield, rating, comment, photo, favorite: Boolean(favorite), templateNotes
+    });
+  } catch (error: any) {
+    console.error('Error creating brew:', error);
+    if (error.message?.includes('FOREIGN KEY constraint failed')) {
+      return res.status(400).json({ error: 'One or more selected items no longer exist. Please refresh and try again.' });
+    }
+    return res.status(500).json({ error: 'Failed to save brew' });
+  }
 });
 
 router.put('/:id', (req: AuthRequest, res: Response) => {
@@ -148,17 +156,25 @@ router.put('/:id', (req: AuthRequest, res: Response) => {
     ? (data.templateNotes ? JSON.stringify(data.templateNotes) : null) 
     : existing.template_notes;
   
-  db.prepare(`
-    UPDATE brews SET coffee_bean_id = ?, batch_id = ?, grinder_id = ?, brewer_id = ?, 
-           recipe_id = ?, coffee_server_id = ?, dose = ?, grind_size = ?, water = ?, yield = ?, temperature = ?, 
-           brew_time = ?, tds = ?, extraction_yield = ?, rating = ?, comment = ?, 
-           photo = ?, favorite = ?, template_notes = ?
-    WHERE id = ? AND user_id = ?
-  `).run(coffeeBeanId, batchId, grinderId, brewerId, recipeId, coffeeServerId, 
-         dose, grindSize, water, yieldVal, temperature, brewTime,
-         tds, extractionYield, rating, comment, photo, favorite, templateNotes, id, userId);
-  
-  res.json({ success: true });
+  try {
+    db.prepare(`
+      UPDATE brews SET coffee_bean_id = ?, batch_id = ?, grinder_id = ?, brewer_id = ?, 
+             recipe_id = ?, coffee_server_id = ?, dose = ?, grind_size = ?, water = ?, yield = ?, temperature = ?, 
+             brew_time = ?, tds = ?, extraction_yield = ?, rating = ?, comment = ?, 
+             photo = ?, favorite = ?, template_notes = ?
+      WHERE id = ? AND user_id = ?
+    `).run(coffeeBeanId, batchId, grinderId, brewerId, recipeId, coffeeServerId, 
+           dose, grindSize, water, yieldVal, temperature, brewTime,
+           tds, extractionYield, rating, comment, photo, favorite, templateNotes, id, userId);
+    
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error updating brew:', error);
+    if (error.message?.includes('FOREIGN KEY constraint failed')) {
+      return res.status(400).json({ error: 'One or more selected items no longer exist. Please refresh and try again.' });
+    }
+    return res.status(500).json({ error: 'Failed to update brew' });
+  }
 });
 
 router.patch('/:id/favorite', (req: AuthRequest, res: Response) => {

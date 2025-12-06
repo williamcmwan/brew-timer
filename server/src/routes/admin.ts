@@ -27,9 +27,7 @@ function isAdmin(userId: number): boolean {
   const user = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as { email: string } | undefined;
   if (!user) return false;
   const adminEmails = getAdminEmails();
-  const result = adminEmails.includes(user.email.toLowerCase());
-  console.log(`isAdmin check: userId=${userId}, email=${user.email}, adminEmails=${JSON.stringify(adminEmails)}, result=${result}`);
-  return result;
+  return adminEmails.includes(user.email.toLowerCase());
 }
 
 // Export for use in auth routes
