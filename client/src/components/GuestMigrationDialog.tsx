@@ -45,7 +45,16 @@ export function GuestMigrationDialog({ open, onOpenChange, isNewAccount, onMigra
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    const deviceId = localStorage.getItem("guestDeviceId");
+    if (deviceId && totalItems > 0) {
+      // Delete guest user and data from database
+      try {
+        await api.auth.deleteGuest(deviceId);
+      } catch (error) {
+        console.error("Failed to delete guest data:", error);
+      }
+    }
     localStorage.removeItem("guestDeviceId");
     onSkip();
     onOpenChange(false);

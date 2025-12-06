@@ -118,6 +118,11 @@ export const api = {
         body: JSON.stringify({ guestDeviceId }),
       });
     },
+    deleteGuest: async (deviceId: string): Promise<{ success: boolean }> => {
+      return request<{ success: boolean }>(`/auth/guest/${deviceId}`, {
+        method: 'DELETE',
+      });
+    },
     changePassword: async (currentPassword: string, newPassword: string, confirmNewPassword: string): Promise<{ message: string }> => {
       return request<{ message: string }>('/auth/change-password', {
         method: 'POST',

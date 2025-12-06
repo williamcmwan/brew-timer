@@ -510,6 +510,37 @@ router.post('/migrate-guest', authMiddleware, async (req: AuthRequest, res) => {
   }
 });
 
+// Delete guest user and all their data (when user skips migration)
+router.delete('/guest/:deviceId', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    
+    const guestUser = db.prepare('SELECT id FROM users WHERE auth_provider = ? AND provider_id = ?')
+      .get('guest', deviceId) as { id: number } | undefined;
+    
+    if (!guestUser) {
+      return res.json({ success: true }); // Already deleted or doesn't exist
+    }
+    
+    const guestId = guestUser.id;
+    
+    // Delete all guest data (order matters due to foreign keys)
+    db.prepare('DELETE FROM brews WHERE user_id = ?').run(guestId);
+    db.prepare('DELETE FROM recipes WHERE user_id = ?').run(guestId);
+    db.prepare('DELETE FROM brew_templates WHERE user_id = ?').run(guestId);
+    db.prepare('DELETE FROM coffee_beans WHERE user_id = ?').run(guestId); // Batches deleted via CASCADE
+    db.prepare('DELETE FROM grinders WHERE user_id = ?').run(guestId);
+    db.prepare('DELETE FROM brewers WHERE user_id = ?').run(guestId);
+    db.prepare('DELETE FROM coffee_servers WHERE user_id = ?').run(guestId);
+    db.prepare('DELETE FROM users WHERE id = ?').run(guestId);
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete guest error:', error);
+    res.status(500).json({ error: 'An error occurred' });
+  }
+});
+
 // Get current user info (for OAuth redirect flow)
 router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
   try {
