@@ -70,7 +70,7 @@ export const compressImage = (
  * @param maxSizeMB - Maximum file size in MB
  * @returns boolean - True if valid
  */
-export const validateImageFile = (file: File, maxSizeMB: number = 5): { valid: boolean; error?: string } => {
+export const validateImageFile = (file: File, maxSizeMB: number = 20): { valid: boolean; error?: string } => {
   const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
   
   if (!validTypes.includes(file.type)) {
