@@ -14,7 +14,7 @@ import recipesRoutes from './routes/recipes.js';
 import adminRoutes from './routes/admin.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 3005;
 
 // Data directory - use process.cwd() which is the server directory
 const dataDir = path.join(process.cwd(), 'data');
