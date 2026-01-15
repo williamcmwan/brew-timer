@@ -35,7 +35,7 @@ start() {
     
     if ps -p "$PID" > /dev/null 2>&1; then
         echo "Application started successfully (PID: $PID)"
-        echo "Server running at http://localhost:3003"
+        echo "Server running at http://localhost:3005"
         echo "Logs: $LOG_FILE"
     else
         echo "Failed to start application. Check logs at $LOG_FILE"
@@ -90,7 +90,7 @@ status() {
         PID=$(cat "$PID_FILE")
         if ps -p "$PID" > /dev/null 2>&1; then
             echo "Application is running (PID: $PID)"
-            echo "Server: http://localhost:3003"
+            echo "Server: http://localhost:3005"
         else
             echo "Application is not running (stale PID file)"
             rm -f "$PID_FILE"
