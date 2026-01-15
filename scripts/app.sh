@@ -26,7 +26,7 @@ start() {
     fi
     
     # Start the server in background (nohup + disown ensures it survives terminal close)
-    nohup node dist/index.js > "$LOG_FILE" 2>&1 &
+    NODE_ENV=production nohup node dist/index.js > "$LOG_FILE" 2>&1 &
     PID=$!
     disown $PID
     echo $PID > "$PID_FILE"
