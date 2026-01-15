@@ -10,41 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, X, Copy } from "lucide-react";
-import type { Recipe, RecipeStep } from "@/contexts/AppContext";
-import { api } from "@/lib/api";
-
-interface AdminRecipe {
-  id: string;
-  name: string;
-  ratio: string;
-  dose: number;
-  photo?: string;
-  process?: string;
-  processSteps?: RecipeStep[];
-  grindSize: number;
-  water: number;
-  yield: number;
-  temperature: number;
-  brewTime: string;
-  grinderModel?: string;
-  brewerModel?: string;
-}
+import type { Recipe, RecipeStep, RecipeTemplate } from "@/contexts/AppContext";
 
 const recipeSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
-  grinderId: z.string().min(1, "Grinder is required"),
-  brewerId: z.string().min(1, "Brewer is required"),
   ratio: z.string().trim().min(1, "Ratio is required").max(20),
   dose: z.number({ required_error: "Dose is required", invalid_type_error: "Dose must be a number" })
     .min(1, "Dose must be at least 1g").max(1000),
   photo: z.string().optional().or(z.literal("")),
   process: z.string().trim().optional().or(z.literal("")),
-  grindSize: z.number({ required_error: "Grind size is required", invalid_type_error: "Grind size must be a number" })
-    .min(0, "Grind size must be at least 0").max(100),
   water: z.number({ required_error: "Water is required", invalid_type_error: "Water must be a number" })
     .min(1, "Water must be at least 1g").max(10000),
-  yield: z.number({ required_error: "Yield is required", invalid_type_error: "Yield must be a number" })
-    .min(1, "Yield must be at least 1g").max(10000),
   temperature: z.number({ required_error: "Temperature is required", invalid_type_error: "Temperature must be a number" })
     .min(1, "Temperature must be at least 1°C").max(100),
   brewTime: z.string().trim().min(1, "Brew time is required").max(20),
@@ -80,23 +56,16 @@ const parseDuration = (val: string): number => {
 };
 
 export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: RecipeDialogProps) {
-  const { addRecipe, updateRecipe, grinders, brewers } = useApp();
+  const { addRecipe, updateRecipe, templates } = useApp();
   const { toast } = useToast();
   const [processSteps, setProcessSteps] = useState<RecipeStep[]>([
     { description: "", waterAmount: 0, duration: 30 }
   ]);
   // Track raw elapsed time input values to allow free editing
   const [elapsedTimeInputs, setElapsedTimeInputs] = useState<Record<number, string>>({});
-  const [adminRecipes, setAdminRecipes] = useState<AdminRecipe[]>([]);
-  const [showAdminPicker, setShowAdminPicker] = useState(false);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
-  useEffect(() => {
-    if (open && !recipe && !isCloning) {
-      api.admin.getRecipes()
-        .then((data) => setAdminRecipes([...data].sort((a, b) => a.name.localeCompare(b.name))))
-        .catch(() => setAdminRecipes([]));
-    }
-  }, [open, recipe, isCloning]);
+  // No need to fetch templates - they're already in context
 
   const {
     register,
@@ -109,15 +78,11 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
     resolver: zodResolver(recipeSchema),
     defaultValues: {
       name: "",
-      grinderId: "",
-      brewerId: "",
       ratio: "1:16",
       dose: 15,
       photo: "",
       process: "",
-      grindSize: 20,
       water: 240,
-      yield: 240,
       temperature: 93,
       brewTime: "3:00",
     },
@@ -135,22 +100,15 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
     }
   };
 
-  const grinderId = watch("grinderId");
-  const brewerId = watch("brewerId");
-
   useEffect(() => {
     if (recipe) {
       reset({
         name: isCloning ? `${recipe.name} (Copy)` : recipe.name,
-        grinderId: recipe.grinderId,
-        brewerId: recipe.brewerId,
         ratio: recipe.ratio,
         dose: recipe.dose,
         photo: recipe.photo || "",
         process: recipe.process || "",
-        grindSize: recipe.grindSize,
         water: recipe.water,
-        yield: recipe.yield,
         temperature: recipe.temperature,
         brewTime: recipe.brewTime,
       });
@@ -170,15 +128,6 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
   }, [recipe, isCloning, reset]);
 
   const onSubmit = async (data: RecipeFormData) => {
-    if (grinders.length === 0) {
-      toast({ title: "No grinders", description: "Please add a grinder first", variant: "destructive" });
-      return;
-    }
-    if (brewers.length === 0) {
-      toast({ title: "No brewers", description: "Please add a brewer first", variant: "destructive" });
-      return;
-    }
-
     const recipeData = {
       ...data,
       processSteps: processSteps.filter(step => step.description.trim() !== "")
@@ -231,53 +180,31 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
     setProcessSteps(newSteps);
   };
 
-  const handleCopyFromAdmin = (adminRecipe: AdminRecipe) => {
-    setValue("name", adminRecipe.name);
-    setValue("ratio", adminRecipe.ratio);
-    setValue("dose", adminRecipe.dose);
-    setValue("photo", adminRecipe.photo || "");
-    setValue("process", adminRecipe.process || "");
-    setValue("grindSize", adminRecipe.grindSize);
-    setValue("water", adminRecipe.water);
-    setValue("yield", adminRecipe.yield);
-    setValue("temperature", adminRecipe.temperature);
-    setValue("brewTime", adminRecipe.brewTime);
+  const handleCopyFromTemplate = (template: RecipeTemplate) => {
+    setValue("name", template.name);
+    setValue("ratio", template.ratio);
+    setValue("dose", template.dose);
+    setValue("photo", template.photo || "");
+    setValue("process", template.process || "");
+    setValue("water", template.water);
+    setValue("temperature", template.temperature);
+    setValue("brewTime", template.brewTime);
     
-    if (adminRecipe.processSteps && adminRecipe.processSteps.length > 0) {
-      setProcessSteps([...adminRecipe.processSteps]);
+    if (template.processSteps && template.processSteps.length > 0) {
+      setProcessSteps([...template.processSteps]);
       const inputs: Record<number, string> = {};
-      adminRecipe.processSteps.forEach((step, index) => {
+      template.processSteps.forEach((step, index) => {
         inputs[index] = formatDuration(step.duration);
       });
       setElapsedTimeInputs(inputs);
     }
     
-    setShowAdminPicker(false);
+    setShowTemplatePicker(false);
     toast({ 
       title: "Copied", 
-      description: `Copied "${adminRecipe.name}" settings. Please select your grinder and brewer.`
+      description: `Copied "${template.name}" settings.`
     });
   };
-
-  if (grinders.length === 0 || brewers.length === 0) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Missing Equipment</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-muted-foreground">
-              You need to add at least one grinder and one brewer before creating recipes.
-            </p>
-            <Button onClick={() => onOpenChange(false)} className="w-full">
-              OK
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -286,40 +213,37 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
           <DialogTitle>{isCloning ? "Clone Recipe" : recipe ? "Edit Recipe" : "Add Recipe"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit, onFormError)} className="space-y-4">
-          {!recipe && !isCloning && adminRecipes.length > 0 && (
+          {!recipe && !isCloning && templates.length > 0 && (
             <div className="space-y-2">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 className="w-full"
-                onClick={() => setShowAdminPicker(!showAdminPicker)}
+                onClick={() => setShowTemplatePicker(!showTemplatePicker)}
               >
                 <Copy className="h-4 w-4 mr-2" />
                 Copy from templates
               </Button>
-              {showAdminPicker && (
+              {showTemplatePicker && (
                 <div className="border rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto bg-muted/50">
-                  {adminRecipes.map((ar) => (
+                  {templates.map((template) => (
                     <Button
-                      key={ar.id}
+                      key={template.id}
                       type="button"
                       variant="ghost"
                       size="sm"
                       className="w-full justify-start text-left h-auto py-2"
-                      onClick={() => handleCopyFromAdmin(ar)}
+                      onClick={() => handleCopyFromTemplate(template)}
                     >
                       <div className="flex items-center gap-2 w-full">
-                        {ar.photo ? (
-                          <img src={ar.photo} alt={ar.name} className="w-8 h-8 rounded object-cover shrink-0" />
+                        {template.photo ? (
+                          <img src={template.photo} alt={template.name} className="w-8 h-8 rounded object-cover shrink-0" />
                         ) : (
                           <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground shrink-0">—</div>
                         )}
                         <div className="truncate">
-                          {ar.name}
-                          <span className="text-xs text-muted-foreground ml-2">
-                            ({ar.brewerModel || "Unknown brewer"})
-                          </span>
+                          {template.name}
                         </div>
                       </div>
                     </Button>
@@ -332,40 +256,6 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
             <Label htmlFor="name">Name *</Label>
             <Input id="name" {...register("name")} placeholder="e.g., Morning V60" />
             {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="grinderId">Grinder *</Label>
-            <Select value={grinderId} onValueChange={(value) => setValue("grinderId", value)}>
-              <SelectTrigger id="grinderId" className="w-full">
-                <SelectValue placeholder="Select grinder" />
-              </SelectTrigger>
-              <SelectContent>
-                {grinders.map((g) => (
-                  <SelectItem key={g.id} value={g.id}>
-                    {g.model}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.grinderId && <p className="text-sm text-destructive">{errors.grinderId.message}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="brewerId">Brewer *</Label>
-            <Select value={brewerId} onValueChange={(value) => setValue("brewerId", value)}>
-              <SelectTrigger id="brewerId" className="w-full">
-                <SelectValue placeholder="Select brewer" />
-              </SelectTrigger>
-              <SelectContent>
-                {brewers.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.model}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.brewerId && <p className="text-sm text-destructive">{errors.brewerId.message}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -473,18 +363,7 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="grindSize">Grind Size *</Label>
-              <Input
-                id="grindSize"
-                type="number"
-                step="any"
-                {...register("grindSize", { valueAsNumber: true })}
-              />
-              {errors.grindSize && <p className="text-sm text-destructive">{errors.grindSize.message}</p>}
-            </div>
-
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="water">Water (g) *</Label>
               <Input
@@ -497,19 +376,6 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="yield">Yield (g) *</Label>
-              <Input
-                id="yield"
-                type="number"
-                step="any"
-                {...register("yield", { valueAsNumber: true })}
-              />
-              {errors.yield && <p className="text-sm text-destructive">{errors.yield.message}</p>}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
               <Label htmlFor="temperature">Temp (°C) *</Label>
               <Input
                 id="temperature"
@@ -519,12 +385,12 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
               />
               {errors.temperature && <p className="text-sm text-destructive">{errors.temperature.message}</p>}
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="brewTime">Brew Time *</Label>
-              <Input id="brewTime" {...register("brewTime")} placeholder="3:00" />
-              {errors.brewTime && <p className="text-sm text-destructive">{errors.brewTime.message}</p>}
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="brewTime">Brew Time *</Label>
+            <Input id="brewTime" {...register("brewTime")} placeholder="3:00" />
+            {errors.brewTime && <p className="text-sm text-destructive">{errors.brewTime.message}</p>}
           </div>
 
           <div className="flex gap-2 pt-4">
