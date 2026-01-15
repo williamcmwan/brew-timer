@@ -1,216 +1,247 @@
-import { Router, Response } from 'express';
+import express from 'express';
 import { db } from '../db/schema.js';
-import { AuthRequest } from '../middleware/auth.js';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
-const router = Router();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const router = express.Router();
 
-// Get admin emails from environment (comma-separated list)
-function getAdminEmails(): string[] {
-  const adminEmails = process.env.ADMIN_EMAILS || 'admin@admin.com';
-  return adminEmails.split(',').map(email => email.trim().toLowerCase());
-}
-
-// Get template user email from environment
-function getTemplateUserEmail(): string {
-  return process.env.TEMPLATE_USER_EMAIL || 'admin@admin.com';
-}
-
-// Get template user ID (for copying equipment/recipes)
-function getTemplateUserId(): number | null {
-  const templateEmail = getTemplateUserEmail();
-  const templateUser = db.prepare('SELECT id FROM users WHERE LOWER(email) = LOWER(?)').get(templateEmail) as { id: number } | undefined;
-  return templateUser?.id || null;
-}
-
-// Check if current user is admin
-function isAdmin(userId: number): boolean {
-  const user = db.prepare('SELECT email FROM users WHERE id = ?').get(userId) as { email: string } | undefined;
-  if (!user) return false;
-  const adminEmails = getAdminEmails();
-  return adminEmails.includes(user.email.toLowerCase());
-}
-
-// Export for use in auth routes
-export { isAdmin };
-
-// Admin middleware
-function adminOnly(req: AuthRequest, res: Response, next: () => void) {
-  if (!req.userId || !isAdmin(req.userId)) {
-    return res.status(403).json({ error: 'Admin access required' });
+// Configure multer for photo uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(process.cwd(), 'data', 'template-images');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+    const ext = path.extname(file.originalname);
+    cb(null, uniqueSuffix + ext);
   }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
+
+// Admin authentication middleware
+const adminAuth = (req: any, res: any, next: any) => {
+  console.log('Admin auth middleware hit:', req.path);
+  const adminKey = req.headers['x-admin-key'] || req.query.key;
+  const validAdminKey = process.env.ADMIN_KEY || 'coffee-admin-2024';
+  
+  console.log('Admin key provided:', adminKey);
+  console.log('Valid admin key:', validAdminKey);
+  
+  if (!adminKey || adminKey !== validAdminKey) {
+    console.log('Admin auth failed');
+    return res.status(401).json({ error: 'Invalid admin key' });
+  }
+  
+  console.log('Admin auth successful');
   next();
-}
+};
 
-// Get daily stats (user registrations + token usage)
-router.get('/stats/daily', adminOnly, (req: AuthRequest, res: Response) => {
+// Photo upload endpoint
+router.post('/upload-photo', adminAuth, upload.single('photo'), (req, res) => {
   try {
-    // Get user registrations by date
-    const userStats = db.prepare(`
-      SELECT DATE(created_at) as date, COUNT(*) as userCount
-      FROM users
-      GROUP BY DATE(created_at)
-      ORDER BY date DESC
-    `).all() as { date: string; userCount: number }[];
-  
-    // Get token usage by date from api_usage table
-    const tokenStats = db.prepare(`
-      SELECT DATE(created_at) as date, 
-             SUM(input_tokens) as inputTokens, 
-             SUM(output_tokens) as outputTokens
-      FROM api_usage
-      GROUP BY DATE(created_at)
-    `).all() as { date: string; inputTokens: number; outputTokens: number }[];
-  
-    // Merge data
-    const allDates = new Set([
-      ...userStats.map(s => s.date),
-      ...tokenStats.map(t => t.date)
-    ]);
-  
-    const result = Array.from(allDates).map(date => ({
-      date,
-      userCount: userStats.find(s => s.date === date)?.userCount || 0,
-      inputTokens: tokenStats.find(t => t.date === date)?.inputTokens || 0,
-      outputTokens: tokenStats.find(t => t.date === date)?.outputTokens || 0,
-    })).sort((a, b) => b.date.localeCompare(a.date));
-  
-    // Calculate totals
-    const totals = {
-      totalUsers: userStats.reduce((sum, s) => sum + s.userCount, 0),
-      totalInputTokens: tokenStats.reduce((sum, t) => sum + t.inputTokens, 0),
-      totalOutputTokens: tokenStats.reduce((sum, t) => sum + t.outputTokens, 0),
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+    
+    const relativePath = `/template-images/${req.file.filename}`;
+    res.json({ path: relativePath });
+  } catch (error) {
+    console.error('Error uploading photo:', error);
+    res.status(500).json({ error: 'Failed to upload photo' });
+  }
+});
+
+// Get all recipe templates
+router.get('/templates', adminAuth, (req, res) => {
+  try {
+    const stmt = db.prepare(`
+      SELECT id, name, ratio, dose, photo, process, process_steps, 
+             water, temperature, brew_time, created_at, updated_at
+      FROM recipe_templates 
+      ORDER BY name
+    `);
+    
+    const templates = stmt.all().map((template: any) => {
+      return {
+        id: template.id.toString(),
+        name: template.name,
+        ratio: template.ratio,
+        dose: template.dose,
+        photo: template.photo,
+        process: template.process,
+        water: template.water,
+        temperature: template.temperature,
+        brewTime: template.brew_time, // Convert brew_time to brewTime
+        processSteps: template.process_steps ? JSON.parse(template.process_steps) : undefined,
+        created_at: template.created_at,
+        updated_at: template.updated_at
+      };
+    });
+
+    res.json(templates);
+  } catch (error) {
+    console.error('Error fetching recipe templates:', error);
+    res.status(500).json({ error: 'Failed to fetch recipe templates' });
+  }
+});
+
+// Create new recipe template
+router.post('/templates', adminAuth, (req, res) => {
+  try {
+    const { 
+      name, ratio, dose, photo, process, processSteps, 
+      water, temperature, brewTime 
+    } = req.body;
+    
+    const stmt = db.prepare(`
+      INSERT INTO recipe_templates 
+      (name, ratio, dose, photo, process, process_steps, grind_size, water, yield, 
+       temperature, brew_time, grinder_model, brewer_model, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `);
+    
+    const result = stmt.run(
+      name,
+      ratio,
+      dose,
+      photo || null,
+      process || null,
+      processSteps ? JSON.stringify(processSteps) : null,
+      null, // grind_size - no longer used
+      water,
+      null, // yield - no longer used
+      temperature,
+      brewTime,
+      null, // grinder_model - set to null
+      null  // brewer_model - set to null
+    );
+
+    const newTemplate = {
+      id: result.lastInsertRowid.toString(),
+      name,
+      ratio,
+      dose,
+      photo,
+      process,
+      processSteps,
+      water,
+      temperature,
+      brewTime
     };
-  
-    res.json({ daily: result, totals });
+
+    res.status(201).json(newTemplate);
   } catch (error) {
-    console.error('Error in /stats/daily:', error);
-    res.status(500).json({ error: 'Failed to load stats' });
+    console.error('Error creating recipe template:', error);
+    res.status(500).json({ error: 'Failed to create recipe template' });
   }
 });
 
-// Get users registered on a specific date with their record counts
-router.get('/stats/users/:date', adminOnly, (req: AuthRequest, res: Response) => {
+// Update recipe template
+router.put('/templates/:id', adminAuth, (req, res) => {
   try {
-    const { date } = req.params;
+    const { id } = req.params;
+    const { 
+      name, ratio, dose, photo, process, processSteps, 
+      water, temperature, brewTime 
+    } = req.body;
     
-    const users = db.prepare(`
-      SELECT 
-        u.id,
-        u.email,
-        u.created_at as registeredAt,
-        (SELECT COUNT(*) FROM coffee_beans WHERE user_id = u.id AND source = 'ai') as beansAI,
-        (SELECT COUNT(*) FROM coffee_beans WHERE user_id = u.id AND (source = 'manual' OR source IS NULL)) as beansManual,
-        (SELECT COUNT(*) FROM grinders WHERE user_id = u.id) as grinders,
-        (SELECT COUNT(*) FROM brewers WHERE user_id = u.id) as brewers,
-        (SELECT COUNT(*) FROM coffee_servers WHERE user_id = u.id) as servers,
-        (SELECT COUNT(*) FROM recipes WHERE user_id = u.id) as recipes,
-        (SELECT COUNT(*) FROM brew_templates WHERE user_id = u.id) as brewTemplates,
-        (SELECT COUNT(*) FROM brews WHERE user_id = u.id) as brewHistory
-      FROM users u
-      WHERE DATE(u.created_at) = ?
-      ORDER BY u.created_at DESC
-    `).all(date) as any[];
+    const stmt = db.prepare(`
+      UPDATE recipe_templates 
+      SET name = ?, ratio = ?, dose = ?, photo = ?, process = ?, process_steps = ?,
+          grind_size = ?, water = ?, yield = ?, temperature = ?, brew_time = ?, 
+          grinder_model = ?, brewer_model = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `);
     
-    res.json(users);
+    const result = stmt.run(
+      name,
+      ratio,
+      dose,
+      photo || null,
+      process || null,
+      processSteps ? JSON.stringify(processSteps) : null,
+      null, // grind_size - no longer used
+      water,
+      null, // yield - no longer used
+      temperature,
+      brewTime,
+      null, // grinder_model - set to null
+      null, // brewer_model - set to null
+      id
+    );
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Recipe template not found' });
+    }
+
+    res.json({ success: true });
   } catch (error) {
-    console.error('Error in /stats/users/:date:', error);
-    res.status(500).json({ error: 'Failed to load user details' });
+    console.error('Error updating recipe template:', error);
+    res.status(500).json({ error: 'Failed to update recipe template' });
   }
 });
 
-// Get template user's grinders (for "Copy from templates" feature)
-router.get('/grinders', (req: AuthRequest, res: Response) => {
-  const templateUserId = getTemplateUserId();
-  if (!templateUserId) {
-    return res.json([]);
+// Delete recipe template
+router.delete('/templates/:id', adminAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const stmt = db.prepare('DELETE FROM recipe_templates WHERE id = ?');
+    const result = stmt.run(id);
+
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Recipe template not found' });
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting recipe template:', error);
+    res.status(500).json({ error: 'Failed to delete recipe template' });
   }
-  
-  const grinders = db.prepare(`
-    SELECT id, model, photo, burr_type as burrType, ideal_for as idealFor 
-    FROM grinders WHERE user_id = ?
-  `).all(templateUserId) as any[];
-  
-  res.json(grinders.map(g => ({ ...g, id: String(g.id) })));
 });
 
-// Get template user's brewers
-router.get('/brewers', (req: AuthRequest, res: Response) => {
-  const templateUserId = getTemplateUserId();
-  if (!templateUserId) {
-    return res.json([]);
-  }
-  
-  const brewers = db.prepare(`
-    SELECT id, model, photo, type 
-    FROM brewers WHERE user_id = ?
-  `).all(templateUserId) as any[];
-  
-  res.json(brewers.map(b => ({ ...b, id: String(b.id) })));
-});
+// Get admin dashboard stats
+router.get('/stats', adminAuth, (req, res) => {
+  try {
+    const templatesCount = db.prepare('SELECT COUNT(*) as count FROM recipe_templates').get() as any;
+    const guestUsersCount = db.prepare('SELECT COUNT(*) as count FROM guest_users').get() as any;
+    const recipesCount = db.prepare('SELECT COUNT(*) as count FROM recipes').get() as any;
+    
+    const recentActivity = db.prepare(`
+      SELECT 'recipe' as type, name, created_at 
+      FROM recipes 
+      ORDER BY created_at DESC 
+      LIMIT 10
+    `).all();
 
-// Get template user's coffee servers
-router.get('/coffee-servers', (req: AuthRequest, res: Response) => {
-  const templateUserId = getTemplateUserId();
-  if (!templateUserId) {
-    return res.json([]);
+    res.json({
+      templates: templatesCount.count,
+      guestUsers: guestUsersCount.count,
+      recipes: recipesCount.count,
+      recentActivity
+    });
+  } catch (error) {
+    console.error('Error fetching admin stats:', error);
+    res.status(500).json({ error: 'Failed to fetch admin stats' });
   }
-  
-  const servers = db.prepare(`
-    SELECT id, model, photo, max_volume as maxVolume, empty_weight as emptyWeight 
-    FROM coffee_servers WHERE user_id = ?
-  `).all(templateUserId) as any[];
-  
-  res.json(servers.map(s => ({ ...s, id: String(s.id) })));
-});
-
-// Get template user's recipes (without grinder/brewer IDs since those are user-specific)
-router.get('/recipes', (req: AuthRequest, res: Response) => {
-  const templateUserId = getTemplateUserId();
-  if (!templateUserId) {
-    return res.json([]);
-  }
-  
-  const recipes = db.prepare(`
-    SELECT r.id, r.name, r.ratio, r.dose, r.photo, r.process, r.process_steps as processSteps,
-           r.grind_size as grindSize, r.water, r.yield, r.temperature, r.brew_time as brewTime,
-           g.model as grinderModel, b.model as brewerModel
-    FROM recipes r
-    LEFT JOIN grinders g ON r.grinder_id = g.id
-    LEFT JOIN brewers b ON r.brewer_id = b.id
-    WHERE r.user_id = ?
-  `).all(templateUserId) as any[];
-  
-  res.json(recipes.map(r => ({
-    ...r,
-    id: String(r.id),
-    processSteps: r.processSteps ? JSON.parse(r.processSteps) : [],
-  })));
-});
-
-// Get template user's brew templates
-router.get('/brew-templates', (req: AuthRequest, res: Response) => {
-  const templateUserId = getTemplateUserId();
-  if (!templateUserId) {
-    return res.json([]);
-  }
-  
-  const templates = db.prepare(`
-    SELECT id, name, fields FROM brew_templates WHERE user_id = ?
-  `).all(templateUserId) as any[];
-  
-  res.json(templates.map(t => ({
-    id: String(t.id),
-    name: t.name,
-    fields: JSON.parse(t.fields),
-  })));
-});
-
-// Check if current user is admin
-router.get('/check', (req: AuthRequest, res: Response) => {
-  if (!req.userId) {
-    return res.json({ isAdmin: false });
-  }
-  res.json({ isAdmin: isAdmin(req.userId) });
 });
 
 export default router;

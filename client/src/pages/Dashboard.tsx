@@ -1,223 +1,370 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp, GUEST_LIMITS } from "@/contexts/AppContext";
+import { useApp } from "@/contexts/AppContext";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Coffee, Settings, Plus, History, TrendingUp, GitCompare, Package, Star, Sparkles, MessageCircle, ClipboardCheck, Shield, HelpCircle, UserPlus } from "lucide-react";
+import { Coffee, Star, Loader2, Shield, Timer, Pencil, Plus, Trash2 } from "lucide-react";
+import { RecipeDialog } from "@/components/equipment/RecipeDialog";
+import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import type { Recipe } from "@/contexts/AppContext";
 
 export default function Dashboard() {
-  const { user, brews, coffeeBeans, recipes, grinders, brewers, logout, isGuest } = useApp();
+  const { recipes, isLoading, toggleRecipeFavorite, deleteRecipe } = useApp();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const recentBrews = brews.slice(0, 5);
-  
-  // Check if user is new (no beans added yet - they need to set up their own beans)
-  const isNewUser = coffeeBeans.length === 0;
+  const favoriteRecipes = recipes.filter(r => r.favorite);
+  const otherRecipes = recipes.filter(r => !r.favorite);
 
+  const handleRecipeSelect = (recipe: any) => {
+    navigate("/brew-timer", { state: { recipe } });
+  };
+
+  const handleEdit = (recipe: Recipe, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingRecipe(recipe);
+    setDialogOpen(true);
+  };
+
+  const handleToggleFavorite = (recipeId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    toggleRecipeFavorite(recipeId);
+  };
+
+  const handleAdd = () => {
+    setEditingRecipe(null);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      deleteRecipe(id);
+      setDeleteId(null);
+      toast({
+        title: "Recipe deleted",
+        description: "Recipe has been removed successfully",
+      });
+    } catch (error) {
+      setDeleteId(null);
+      toast({
+        title: "Cannot delete",
+        description: error instanceof Error ? error.message : "Failed to delete recipe",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
       <div className="container max-w-lg mx-auto p-4 space-y-4">
-        <div className="flex items-center justify-between pt-4">
+        <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-3">
             <div className="rounded-full bg-primary/10 p-2">
               <Coffee className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Hello, {user?.name}</h1>
-              <p className="text-sm text-muted-foreground">Ready to brew?</p>
+              <h1 className="text-2xl font-bold text-foreground">Coffee Timer</h1>
+              <p className="text-sm text-muted-foreground">Select a recipe to start brewing</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a href="https://www.buymeacoffee.com/wcmw" target="_blank" rel="noopener noreferrer">
-              <img 
-                src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
-                alt="Buy Me A Coffee" 
-                className="h-8 w-auto"
-              />
-            </a>
-            <Button variant="ghost" size="icon" onClick={() => navigate("/guide")} title="User Guide">
-              <HelpCircle className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => navigate("/contact")} title="Contact">
-              <MessageCircle className="h-5 w-5" />
-            </Button>
+            <ThemeToggle />
           </div>
         </div>
 
-        <Card 
-          className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0 cursor-pointer hover:shadow-lg transition-shadow"
-          onClick={() => navigate("/brew")}
-        >
-          <CardContent className="p-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold">New Brew Session</h2>
-              <div className="rounded-full h-10 w-10 bg-secondary flex items-center justify-center">
-                <Plus className="h-5 w-5 text-secondary-foreground" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {favoriteRecipes.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Star className="h-5 w-5 text-yellow-500" />
+                Favorite Recipes
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-3">
+              {favoriteRecipes.map((recipe) => (
+                <div
+                  key={recipe.id}
+                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                  onClick={() => handleRecipeSelect(recipe)}
+                >
+                  {recipe.photo && (
+                    <img 
+                      src={recipe.photo.startsWith('/') ? `http://localhost:3003${recipe.photo}` : recipe.photo} 
+                      alt={recipe.name} 
+                      className="w-16 h-16 object-cover rounded-md"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{recipe.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {recipe.dose}g • {recipe.ratio} • {recipe.temperature}°C • {recipe.brewTime}
+                    </p>
+                    <div className="flex items-center gap-0.5 mt-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={(e) => handleToggleFavorite(recipe.id, e)}
+                        title="Remove from favorites"
+                      >
+                        <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500 mr-0.5" />
+                        <span className="text-xs">Favorite</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={(e) => handleEdit(recipe, e)}
+                        title="Edit recipe"
+                      >
+                        <Pencil className="h-3.5 w-3.5 mr-0.5" />
+                        <span className="text-xs">Edit</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteId(recipe.id);
+                        }}
+                        title="Delete recipe"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-0.5" />
+                        <span className="text-xs">Delete</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRecipeSelect(recipe);
+                        }}
+                        title="Start timer"
+                      >
+                        <Timer className="h-3.5 w-3.5 mr-0.5" />
+                        <span className="text-xs">Start</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Recent Brews</CardTitle>
+              <CardTitle className="text-lg">All Recipes</CardTitle>
               <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => navigate("/history")}
-                className="flex items-center gap-2"
+                variant="ghost" 
+                size="sm"
+                onClick={handleAdd}
+                title="Add Recipe"
               >
-                <History className="h-4 w-4" />
-                View All
+                <Plus className="h-4 w-4 mr-1" />
+                Add
               </Button>
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            {recentBrews.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No brews yet. Start your first brew session!
-              </p>
+            {isLoading ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                <p className="text-sm text-muted-foreground">Loading recipes...</p>
+              </div>
+            ) : recipes.length === 0 ? (
+              <div className="text-center py-8">
+                <Coffee className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mb-4">
+                  No recipes available. Add some recipes to get started!
+                </p>
+                <Button onClick={() => setDialogOpen(true)}>
+                  Add Recipe
+                </Button>
+              </div>
             ) : (
               <div className="space-y-3">
-                {recentBrews.map((brew) => {
-                  const bean = coffeeBeans.find(b => b.id === brew.coffeeBeanId);
-                  const recipe = recipes.find(r => r.id === brew.recipeId);
-                  const displayImage = brew.photo || bean?.photo;
-                  
-                  return (
-                    <div
-                      key={brew.id}
-                      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
-                      onClick={() => navigate("/history", { state: { brewId: brew.id } })}
-                    >
-                      {displayImage && (
-                        <img 
-                          src={displayImage} 
-                          alt="Brew" 
-                          className="w-16 h-16 object-cover rounded-md"
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">
-                          {bean?.name || "Unknown Bean"} - {recipe?.name || "Custom"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(brew.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {brew.rating != null && brew.rating > 0 && (
-                          <div className="flex items-center gap-1">
-                            <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                            <span className="text-sm font-medium">{brew.rating}</span>
-                          </div>
-                        )}
+                {(favoriteRecipes.length > 0 ? otherRecipes : recipes).map((recipe) => (
+                  <div
+                    key={recipe.id}
+                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                    onClick={() => handleRecipeSelect(recipe)}
+                  >
+                    {recipe.photo && (
+                      <img 
+                        src={recipe.photo.startsWith('/') ? `http://localhost:3003${recipe.photo}` : recipe.photo} 
+                        alt={recipe.name} 
+                        className="w-16 h-16 object-cover rounded-md"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">{recipe.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {recipe.dose}g • {recipe.ratio} • {recipe.temperature}°C • {recipe.brewTime}
+                      </p>
+                      <div className="flex items-center gap-0.5 mt-2">
                         <Button
                           variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 shrink-0"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={(e) => handleToggleFavorite(recipe.id, e)}
+                          title={recipe.favorite ? "Remove from favorites" : "Add to favorites"}
+                        >
+                          <Star className={`h-3.5 w-3.5 mr-0.5 ${recipe.favorite ? "fill-yellow-500 text-yellow-500" : ""}`} />
+                          <span className="text-xs">Favorite</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={(e) => handleEdit(recipe, e)}
+                          title="Edit recipe"
+                        >
+                          <Pencil className="h-3.5 w-3.5 mr-0.5" />
+                          <span className="text-xs">Edit</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
                           onClick={(e) => {
                             e.stopPropagation();
-                            navigate('/brew', { state: { editBrew: brew, step: 4 } });
+                            setDeleteId(recipe.id);
                           }}
-                          title="Evaluate brew"
+                          title="Delete recipe"
                         >
-                          <ClipboardCheck className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5 mr-0.5" />
+                          <span className="text-xs">Delete</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRecipeSelect(recipe);
+                          }}
+                          title="Start timer"
+                        >
+                          <Timer className="h-3.5 w-3.5 mr-0.5" />
+                          <span className="text-xs">Start</span>
                         </Button>
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
           </CardContent>
         </Card>
 
-        {(isNewUser || isGuest) && (
-          <Alert className={isGuest ? "border-amber-500/50 bg-amber-500/5" : "border-primary/50 bg-primary/5"}>
-            {isGuest ? <UserPlus className="h-4 w-4 text-amber-500" /> : <Sparkles className="h-4 w-4 text-primary" />}
-            <AlertTitle className={isGuest ? "text-amber-600" : "text-primary"}>
-              {isGuest ? "Welcome! You're in Guest Mode" : "Welcome to Brew Journal!"}
-            </AlertTitle>
-            <AlertDescription className="text-sm space-y-1">
-              {isNewUser && (
-                <p>
-                  Get started by adding your coffee beans and equipment in Settings below.{" "}
-                  <span 
-                    className={`${isGuest ? "text-amber-600" : "text-primary"} font-medium cursor-pointer underline`}
-                    onClick={() => navigate("/guide")}
-                  >
-                    View the Getting Started guide
-                  </span>
-                </p>
-              )}
-              {isGuest && (
-                <p>You're using limited features (max {GUEST_LIMITS.beans} items per category). Sign up to unlock unlimited access and keep your data safe.</p>
-              )}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid grid-cols-4 gap-3 !mt-3">
-          <Card 
-            className={`hover:shadow-md transition-all cursor-pointer ${
-              isNewUser ? 'ring-2 ring-primary ring-offset-2 animate-pulse' : ''
-            }`} 
-            onClick={() => navigate("/settings")}
-          >
-            <CardContent className="p-4 text-center">
-              <Settings className="h-6 w-6 mx-auto mb-1 text-primary" />
-              <p className="font-medium text-xs">Settings</p>
-            </CardContent>
-          </Card>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/analytics")}>
-            <CardContent className="p-4 text-center">
-              <TrendingUp className="h-6 w-6 mx-auto mb-1 text-primary" />
-              <p className="font-medium text-xs">Analytics</p>
-            </CardContent>
-          </Card>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/comparison")}>
-            <CardContent className="p-4 text-center">
-              <GitCompare className="h-6 w-6 mx-auto mb-1 text-primary" />
-              <p className="font-medium text-xs">Compare</p>
-            </CardContent>
-          </Card>
-          <Card className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/inventory")}>
-            <CardContent className="p-4 text-center">
-              <Package className="h-6 w-6 mx-auto mb-1 text-primary" />
-              <p className="font-medium text-xs">Inventory</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {user?.isAdmin && (
-          <Card className="hover:shadow-md transition-shadow cursor-pointer border-amber-500/50 bg-amber-500/5" onClick={() => navigate("/admin")}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <Shield className="h-6 w-6 text-amber-500" />
-              <div>
-                <p className="font-medium">Admin Dashboard</p>
-                <p className="text-xs text-muted-foreground">View user stats and token usage</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {isGuest ? (
-          <Button className="w-full" onClick={() => {
-            logout();
-            navigate("/login");
-          }}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Sign up / Sign in
-          </Button>
-        ) : (
-          <Button variant="outline" className="w-full" onClick={logout}>
-            Sign out
-          </Button>
-        )}
+        {/* Admin Access */}
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="p-4 flex items-center gap-3">
+            <Shield className="h-6 w-6 text-amber-500" />
+            <div className="flex-1">
+              <p className="font-medium">Admin Panel</p>
+              <p className="text-xs text-muted-foreground">Manage recipe templates</p>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={async () => {
+                try {
+                  console.log('Testing API connectivity...');
+                  
+                  // Test regular recipes endpoint first
+                  const recipesData = await api.recipes.list();
+                  console.log('Recipes API works:', recipesData.length, 'recipes');
+                  
+                  // Test templates endpoint
+                  const templatesData = await api.recipes.getTemplates();
+                  console.log('Templates API works:', templatesData.length, 'templates');
+                  console.log('Template photos:', templatesData.filter(t => t.photo).map(t => ({ name: t.name, photo: t.photo })));
+                  
+                  // Test admin endpoint
+                  const adminData = await api.admin.getStats('coffee-admin-2024');
+                  console.log('Admin API works:', adminData);
+                  
+                  // Test image loading
+                  const templatesWithPhotos = templatesData.filter(t => t.photo);
+                  if (templatesWithPhotos.length > 0) {
+                    const testImage = templatesWithPhotos[0];
+                    console.log('Testing image load:', testImage.photo);
+                    
+                    const img = new Image();
+                    img.onload = () => console.log('✅ Image loads successfully:', testImage.photo);
+                    img.onerror = (e) => console.error('❌ Image failed to load:', testImage.photo, e);
+                    img.src = testImage.photo;
+                  }
+                  
+                  alert(`API test successful!\nRecipes: ${recipesData.length}\nTemplates: ${templatesData.length}\nWith photos: ${templatesData.filter(t => t.photo).length}\nCheck console for details.`);
+                } catch (error) {
+                  console.error('API test failed:', error);
+                  alert('API test failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                }
+              }}
+            >
+              Test API
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate("/admin")}
+            >
+              Access
+            </Button>
+          </CardContent>
+        </Card>
       </div>
+
+      <RecipeDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        recipe={editingRecipe}
+        isCloning={false}
+      />
+
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Recipe</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this recipe? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

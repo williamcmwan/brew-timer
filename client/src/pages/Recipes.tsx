@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp, GUEST_LIMITS } from "@/contexts/AppContext";
+import { useApp } from "@/contexts/AppContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Timer, Star, Filter, Copy } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Timer, Star, Filter, Copy, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RecipeDialog } from "@/components/equipment/RecipeDialog";
-import { ShareButton } from "@/components/ShareButton";
-import { generateRecipeShareText } from "@/lib/shareUtils";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -22,7 +20,7 @@ import {
 import type { Recipe } from "@/contexts/AppContext";
 
 export default function Recipes() {
-  const { recipes, grinders, brewers, deleteRecipe, toggleRecipeFavorite, isGuest, guestLimitReached } = useApp();
+  const { recipes, deleteRecipe, toggleRecipeFavorite, isLoading } = useApp();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -31,9 +29,6 @@ export default function Recipes() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
 
-  const getGrinderName = (id: string) => grinders.find((g) => g.id === id)?.model || "Unknown";
-  const getBrewerName = (id: string) => brewers.find((b) => b.id === id)?.model || "Unknown";
-
   const handleEdit = (recipe: Recipe) => {
     setEditingRecipe(recipe);
     setIsCloning(false);
@@ -41,28 +36,12 @@ export default function Recipes() {
   };
 
   const handleClone = (recipe: Recipe) => {
-    if (guestLimitReached("recipes")) {
-      toast({
-        title: "Guest Limit Reached",
-        description: `Guest users can only add ${GUEST_LIMITS.recipes} recipes. Sign up for unlimited access.`,
-        variant: "destructive",
-      });
-      return;
-    }
     setEditingRecipe(recipe);
     setIsCloning(true);
     setDialogOpen(true);
   };
 
   const handleAdd = () => {
-    if (guestLimitReached("recipes")) {
-      toast({
-        title: "Guest Limit Reached",
-        description: `Guest users can only add ${GUEST_LIMITS.recipes} recipes. Sign up for unlimited access.`,
-        variant: "destructive",
-      });
-      return;
-    }
     setEditingRecipe(null);
     setIsCloning(false);
     setDialogOpen(true);
@@ -70,7 +49,7 @@ export default function Recipes() {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteRecipe(id);
+      deleteRecipe(id);
       setDeleteId(null);
       toast({
         title: "Recipe deleted",
@@ -92,10 +71,10 @@ export default function Recipes() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
-      <div className="container max-w-lg mx-auto p-4 space-y-6">
-        <div className="flex items-center justify-between pt-4">
+      <div className="container max-w-lg mx-auto p-4 space-y-4">
+        <div className="flex items-center justify-between pt-2">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <h1 className="text-2xl font-bold">Recipes</h1>
@@ -120,7 +99,14 @@ export default function Recipes() {
           </div>
         )}
 
-        {filteredRecipes.length === 0 ? (
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Loader2 className="h-12 w-12 mx-auto mb-4 text-primary animate-spin" />
+              <p className="text-muted-foreground">Loading recipes...</p>
+            </CardContent>
+          </Card>
+        ) : filteredRecipes.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
               <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -138,9 +124,12 @@ export default function Recipes() {
                   <div className="flex gap-3">
                     {recipe.photo ? (
                       <img
-                        src={recipe.photo}
+                        src={recipe.photo.startsWith('/') ? `http://localhost:3003${recipe.photo}` : recipe.photo}
                         alt={recipe.name}
                         className="w-12 h-12 rounded-lg object-cover bg-muted flex-shrink-0"
+                        onError={(e) => {
+                          e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect fill="%23ddd" width="48" height="48"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="10"%3ENo image%3C/text%3E%3C/svg%3E';
+                        }}
                       />
                     ) : (
                       <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
@@ -157,7 +146,7 @@ export default function Recipes() {
                             className="h-8 w-8"
                             onClick={() => toggleRecipeFavorite(recipe.id)}
                           >
-                            <Star className={`h-4 w-4 ${recipe.favorite ? "fill-golden text-golden" : ""}`} />
+                            <Star className={`h-4 w-4 ${recipe.favorite ? "fill-yellow-500 text-yellow-500" : ""}`} />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleClone(recipe)} title="Clone recipe">
                             <Copy className="h-4 w-4" />
@@ -176,30 +165,19 @@ export default function Recipes() {
                         </div>
                       </div>
                       <div className="space-y-1 mt-1">
-                        <p className="text-sm">{getGrinderName(recipe.grinderId)}</p>
-                        <p className="text-sm">{getBrewerName(recipe.brewerId)}</p>
+                        <p className="text-sm">Grind: {recipe.grindSize}</p>
                         <p className="text-sm">{recipe.dose}g : {recipe.water}g ({recipe.ratio})</p>
                         <p className="text-sm">{recipe.temperature}°C • {recipe.brewTime}</p>
                       </div>
                       <div className="flex gap-2 mt-3">
                         <Button 
-                          onClick={() => navigate('/brew-timer', { state: { recipeId: recipe.id } })}
+                          onClick={() => navigate('/brew-timer', { state: { recipe } })}
                           size="sm"
                           variant="outline"
                         >
                           <Timer className="h-4 w-4 mr-2" />
-                          Preview Timer
+                          Start Timer
                         </Button>
-                        <ShareButton
-                          title={`Coffee Recipe: ${recipe.name}`}
-                          text={generateRecipeShareText(
-                            recipe,
-                            getGrinderName(recipe.grinderId),
-                            getBrewerName(recipe.brewerId)
-                          )}
-                          size="icon"
-                          variant="outline"
-                        />
                       </div>
                     </div>
                   </div>

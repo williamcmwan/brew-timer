@@ -6,24 +6,12 @@ dotenv.config({ path: '../.env' });
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { initializeDatabase } from './db/schema.js';
-import authRoutes from './routes/auth.js';
-import grindersRoutes from './routes/grinders.js';
-import brewersRoutes from './routes/brewers.js';
 import recipesRoutes from './routes/recipes.js';
-import coffeeBeansRoutes from './routes/coffeeBeans.js';
-import brewsRoutes from './routes/brews.js';
-import brewTemplatesRoutes from './routes/brewTemplates.js';
-import uploadsRoutes from './routes/uploads.js';
-import coffeeServersRoutes from './routes/coffeeServers.js';
-import aiRoutes from './routes/ai.js';
 import adminRoutes from './routes/admin.js';
-import healthRoutes from './routes/health.js';
-import { authMiddleware } from './middleware/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3003;
@@ -34,12 +22,7 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(dataDir, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-console.log('Uploads directory:', uploadsDir);
+console.log('Data directory:', dataDir);
 
 // Initialize database
 initializeDatabase();
@@ -53,123 +36,89 @@ app.set('trust proxy', 1);
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: false, // Disable for SPA compatibility
-  // Additional security headers
-  hsts: {
-    maxAge: 31536000, // 1 year
-    includeSubDomains: true,
-    preload: true,
-  },
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-  noSniff: true,
-  xssFilter: true,
 }));
 
-// CORS configuration - restrict to allowed origins
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()) || [
-  'http://localhost:5173',
-  'http://localhost:3003',
-  'https://coffeebrew.dpdns.org'
-];
+// CORS configuration - allow all origins for the simplified timer app
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Guest-ID', 'X-Admin-Key'],
+}));
 
-// In development, also allow IPv6 localhost variants
-if (process.env.NODE_ENV !== 'production') {
-  allowedOrigins.push('http://[::1]:5173', 'http://127.0.0.1:5173');
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Limit each IP to 1000 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Serve template images as static files
+const templateImagesDir = path.join(dataDir, 'template-images');
+if (fs.existsSync(templateImagesDir)) {
+  app.use('/template-images', express.static(templateImagesDir));
+  console.log('📸 Serving template images from:', templateImagesDir);
 }
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, same-origin, etc.)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    // In development, log blocked origins for debugging
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('CORS blocked origin:', origin);
-    }
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-}));
+// Serve recipe images as static files
+const recipeImagesDir = path.join(dataDir, 'recipe-images');
+if (!fs.existsSync(recipeImagesDir)) {
+  fs.mkdirSync(recipeImagesDir, { recursive: true });
+}
+app.use('/recipe-images', express.static(recipeImagesDir));
+console.log('📸 Serving recipe images from:', recipeImagesDir);
 
-// Rate limiting for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 20, // 20 attempts per window
-  message: { error: 'Too many attempts, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
+// API routes
+app.use('/api/recipes', recipesRoutes);
+app.use('/api/admin', adminRoutes);
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    service: 'coffee-timer-api'
+  });
 });
 
-// Stricter rate limiting for password reset (prevent email bombing)
-const passwordResetLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // 5 attempts per hour per IP
-  message: { error: 'Too many password reset attempts, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// General API rate limiting
-const apiLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 500, // 500 requests per minute
-  message: { error: 'Too many requests, please slow down' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Reduced JSON body size limit
-app.use(express.json({ limit: '5mb' }));
-app.use(cookieParser());
-
-// Apply rate limiting
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/signup', authLimiter);
-app.use('/api/auth/social', authLimiter);
-app.use('/api/auth/forgot-password', passwordResetLimiter);
-app.use('/api/auth/reset-password', authLimiter);
-app.use('/api', apiLimiter);
-
-// Public routes (no auth required)
-app.use('/api/health', healthRoutes);
-app.use('/api/auth', authRoutes);
-
-// Protected routes (auth required)
-app.use('/api/grinders', authMiddleware, grindersRoutes);
-app.use('/api/brewers', authMiddleware, brewersRoutes);
-app.use('/api/recipes', authMiddleware, recipesRoutes);
-app.use('/api/coffee-beans', authMiddleware, coffeeBeansRoutes);
-app.use('/api/brews', authMiddleware, brewsRoutes);
-app.use('/api/brew-templates', authMiddleware, brewTemplatesRoutes);
-app.use('/api/uploads', authMiddleware, uploadsRoutes);
-app.use('/api/coffee-servers', authMiddleware, coffeeServersRoutes);
-app.use('/api/ai', authMiddleware, aiRoutes);
-app.use('/api/admin', authMiddleware, adminRoutes);
-
-// Serve uploaded images from user-specific folders
-// Path format: /uploads/{user_folder}/{filename}
-app.use('/uploads', (req, res, next) => {
-  // Validate path format: /{user_folder}/{safe_filename}
-  // Allow alphanumeric, dots, dashes, underscores in folder and filename
-  const pathMatch = req.path.match(/^\/([a-z0-9._-]+)\/([a-z0-9._-]+\.(jpg|jpeg|png|webp))$/i);
-  if (!pathMatch) {
-    return res.status(400).json({ error: 'Invalid path format' });
+// Serve static files from client dist in production
+if (process.env.NODE_ENV === 'production') {
+  const clientDistPath = path.join(__dirname, '../../client/dist');
+  if (fs.existsSync(clientDistPath)) {
+    app.use(express.static(clientDistPath));
+    
+    // Handle client-side routing
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(clientDistPath, 'index.html'));
+    });
   }
-  next();
-}, express.static(uploadsDir));
+}
 
-// Serve static files from client build
-const clientDistPath = path.join(__dirname, '../../client/dist');
-app.use(express.static(clientDistPath));
+// Error handling middleware
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({ 
+    error: 'Internal server error',
+    message: process.env.NODE_ENV === 'development' ? err.message : 'Something went wrong'
+  });
+});
 
-// SPA fallback - serve index.html for all non-API routes
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(clientDistPath, 'index.html'));
-  }
+// 404 handler for API routes
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
 });
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Coffee Timer API server running on port ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🗄️  Database: ${dataDir}/coffee-timer.db`);
 });
+
+export default app;

@@ -1,13 +1,15 @@
 {
-  "name": "brew-journal-server",
+  "name": "coffee-timer-server",
   "version": "1.0.0",
   "type": "module",
+  "description": "Simple API server for Coffee Brew Timer app",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "migrate:uploads": "tsx scripts/migrate-uploads-to-user-folders.ts",
-    "cleanup:uploads": "tsx scripts/cleanup-orphan-uploads.ts"
+    "seed": "tsx src/scripts/seed-default-recipes.ts",
+    "migrate": "tsx src/scripts/migrate-recipes.ts",
+    "copy-images": "tsx src/scripts/copy-template-images.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

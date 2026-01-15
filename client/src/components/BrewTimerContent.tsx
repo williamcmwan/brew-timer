@@ -3,7 +3,7 @@ import { useApp } from "@/contexts/AppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Play, Pause, RotateCcw, Coffee, X, Check } from "lucide-react";
+import { Play, Pause, RotateCcw, Coffee, X, Check, ArrowLeft } from "lucide-react";
 
 interface TimerStep {
   title: string;
@@ -19,6 +19,7 @@ interface BrewTimerContentProps {
   completeButtonText?: string;
   showCloseButton?: boolean;
   showBorder?: boolean;
+  onBack?: () => void;
 }
 
 export default function BrewTimerContent({ 
@@ -27,9 +28,9 @@ export default function BrewTimerContent({
   onComplete,
   completeButtonText = "Log Brew",
   showCloseButton = true,
-  showBorder = false
+  showBorder = false,
+  onBack
 }: BrewTimerContentProps) {
-  const { grinders, brewers } = useApp();
   
   const [steps, setSteps] = useState<TimerStep[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -71,10 +72,11 @@ export default function BrewTimerContent({
     };
     
     // Add initial preparation step (0 seconds - starts immediately)
+    const grindSizeText = recipe.grindSize ? ` ground at setting ${recipe.grindSize}` : '';
     parsedSteps.push({
       title: "Preparation",
       duration: 0,
-      description: `Heat water to ${recipe.temperature}°C. Prepare ${recipe.dose}g of coffee ground at setting ${recipe.grindSize}.`
+      description: `Heat water to ${recipe.temperature}°C. Prepare ${recipe.dose}g of coffee${grindSizeText}.`
     });
     
     // Use structured process steps if available (elapsed times)
@@ -322,8 +324,6 @@ export default function BrewTimerContent({
     );
   }
 
-  const grinder = grinders.find(g => g.id === recipe.grinderId);
-  const brewer = brewers.find(b => b.id === recipe.brewerId);
   const currentStep = steps[currentStepIndex];
   const totalTime = steps.reduce((sum, step) => sum + step.duration, 0);
   const progressPercentage = totalTime > 0 ? Math.min((totalElapsedTime / totalTime) * 100, 100) : 0;
@@ -349,13 +349,22 @@ export default function BrewTimerContent({
     <Card className={showBorder ? "" : "border-0"}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
+          {onBack && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 -ml-2"
+              onClick={onBack}
+              title="Back"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
           <Coffee className="h-5 w-5" />
           {recipe.name}
         </CardTitle>
-        <div className="text-sm text-muted-foreground space-y-1">
-          <p>Grinder: {grinder?.model || 'Unknown'}</p>
-          <p>Brewer: {brewer?.model || 'Unknown'}</p>
-          <p>Ratio: {recipe.ratio} | Dose: {recipe.dose}g | Water: {recipe.water}ml</p>
+        <div className="text-sm text-muted-foreground">
+          <p>Ratio: {recipe.ratio} · Dose: {recipe.dose}g · Water: {recipe.water}ml · {recipe.temperature}°C</p>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

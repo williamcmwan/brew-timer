@@ -1,250 +1,323 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ArrowLeft, Users, Coins, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
-import { useApp } from "@/contexts/AppContext";
-import { api } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Shield, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-
-interface DailyStats {
-  date: string;
-  userCount: number;
-  inputTokens: number;
-  outputTokens: number;
-}
-
-interface UserDetails {
-  id: number;
-  email: string;
-  registeredAt: string;
-  beansAI: number;
-  beansManual: number;
-  grinders: number;
-  brewers: number;
-  servers: number;
-  recipes: number;
-  brewTemplates: number;
-  brewHistory: number;
-}
-
-interface Totals {
-  totalUsers: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-}
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { TemplateDialog } from "@/components/admin/TemplateDialog";
+import type { RecipeTemplate } from "@/contexts/AppContext";
 
 export default function Admin() {
   const navigate = useNavigate();
-  const { user } = useApp();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
-  const [totals, setTotals] = useState<Totals | null>(null);
-  const [expandedDate, setExpandedDate] = useState<string | null>(null);
-  const [userDetails, setUserDetails] = useState<Record<string, UserDetails[]>>({});
-  const [loadingUsers, setLoadingUsers] = useState<string | null>(null);
+  
+  const [adminKey, setAdminKey] = useState(searchParams.get('key') || 'coffee-admin-2024');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [templates, setTemplates] = useState<RecipeTemplate[]>([]);
+  const [stats, setStats] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<RecipeTemplate | null>(null);
 
-  useEffect(() => {
-    if (!user?.isAdmin) {
-      navigate("/dashboard");
+  const authenticate = async (keyToUse?: string) => {
+    const key = keyToUse || adminKey;
+    if (!key.trim()) {
+      toast({
+        title: "Admin key required",
+        description: "Please enter the admin key",
+        variant: "destructive",
+      });
       return;
     }
-    loadStats();
-  }, [user, navigate]);
 
-  const loadStats = async () => {
+    setIsLoading(true);
     try {
-      const data = await api.admin.getDailyStats();
-      setDailyStats(data.daily);
-      setTotals(data.totals);
+      console.log('Attempting authentication with key:', key);
+      
+      // Use the API client instead of hardcoded URL
+      const result = await api.admin.getStats(key);
+      console.log('Authentication successful:', result);
+      setIsAuthenticated(true);
+      setStats(result);
+      
+      // Load templates
+      const templatesData = await api.admin.getTemplates(key);
+      console.log('Templates loaded:', templatesData.map(t => ({ name: t.name, photo: t.photo })));
+      setTemplates(templatesData);
+      
     } catch (error) {
-      console.error('Failed to load admin stats:', error);
-      toast({ title: "Error", description: error instanceof Error ? error.message : "Failed to load admin stats", variant: "destructive" });
+      console.error('Authentication failed:', error);
+      toast({
+        title: "Authentication failed",
+        description: error instanceof Error ? error.message : "Invalid admin key",
+        variant: "destructive",
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  const toggleDate = async (date: string) => {
-    if (expandedDate === date) {
-      setExpandedDate(null);
-      return;
+  // Auto-authenticate if key is in URL
+  useEffect(() => {
+    const keyFromUrl = searchParams.get('key');
+    if (keyFromUrl && !isAuthenticated) {
+      setAdminKey(keyFromUrl);
+      authenticate(keyFromUrl);
+    } else if (adminKey === 'coffee-admin-2024' && !isAuthenticated) {
+      // Auto-authenticate with default key for testing
+      authenticate(adminKey);
     }
-    
-    setExpandedDate(date);
-    
-    if (!userDetails[date]) {
-      setLoadingUsers(date);
-      try {
-        const users = await api.admin.getUsersByDate(date);
-        setUserDetails(prev => ({ ...prev, [date]: users }));
-      } catch (error) {
-        toast({ title: "Error", description: "Failed to load user details", variant: "destructive" });
-      } finally {
-        setLoadingUsers(null);
-      }
+  }, [searchParams, isAuthenticated]);
+
+  const handleDelete = async (id: string) => {
+    try {
+      await api.admin.deleteTemplate(adminKey, id);
+      setTemplates(prev => prev.filter(t => t.id !== id));
+      setDeleteId(null);
+      toast({
+        title: "Template deleted",
+        description: "Recipe template has been removed successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Cannot delete",
+        description: "Failed to delete recipe template",
+        variant: "destructive",
+      });
     }
   };
 
-  const formatNumber = (num: number) => num.toLocaleString();
+  const handleEdit = (template: RecipeTemplate) => {
+    setEditingTemplate(template);
+    setTemplateDialogOpen(true);
+  };
 
-  if (!user?.isAdmin) {
-    return null;
+  const handleAdd = () => {
+    setEditingTemplate(null);
+    setTemplateDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    // Reload templates after save
+    try {
+      const templatesData = await api.admin.getTemplates(adminKey);
+      console.log('Templates reloaded:', templatesData.map(t => ({ name: t.name, photo: t.photo })));
+      setTemplates(templatesData);
+    } catch (error) {
+      console.error('Failed to reload templates:', error);
+    }
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
+        <div className="container max-w-md mx-auto p-4 space-y-4">
+          <div className="flex items-center gap-4 pt-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold">Admin Access</h1>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Authentication Required
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="adminKey">Admin Key</Label>
+                <Input
+                  id="adminKey"
+                  type="password"
+                  value={adminKey}
+                  onChange={(e) => setAdminKey(e.target.value)}
+                  placeholder="Enter admin key"
+                  onKeyDown={(e) => e.key === 'Enter' && authenticate()}
+                />
+              </div>
+              <Button 
+                onClick={() => authenticate()} 
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Authenticating...
+                  </>
+                ) : (
+                  'Access Admin Panel'
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
       <div className="container max-w-4xl mx-auto p-4 space-y-4">
-        <div className="flex items-center gap-4 pt-4 pb-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-5 w-5" />
+        <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+          </div>
+          <Button onClick={() => setIsAuthenticated(false)} variant="outline">
+            Logout
           </Button>
-          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
         </div>
 
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <>
-            {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Total Users
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold">{formatNumber(totals?.totalUsers || 0)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Coins className="h-4 w-4" />
-                    Input Tokens
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold">{formatNumber(totals?.totalInputTokens || 0)}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                    <Coins className="h-4 w-4" />
-                    Output Tokens
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-2xl font-bold">{formatNumber(totals?.totalOutputTokens || 0)}</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Daily Stats Table */}
+        {/* Stats Cards */}
+        {stats && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Daily Statistics</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10"></TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Users</TableHead>
-                      <TableHead className="text-right">Input Tokens</TableHead>
-                      <TableHead className="text-right">Output Tokens</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {dailyStats.map((stat) => (
-                      <React.Fragment key={stat.date}>
-                        <TableRow 
-                          className="cursor-pointer hover:bg-muted/50"
-                          onClick={() => stat.userCount > 0 && toggleDate(stat.date)}
-                        >
-                          <TableCell>
-                            {stat.userCount > 0 && (
-                              expandedDate === stat.date ? 
-                                <ChevronDown className="h-4 w-4" /> : 
-                                <ChevronRight className="h-4 w-4" />
-                            )}
-                          </TableCell>
-                          <TableCell className="font-medium">{stat.date}</TableCell>
-                          <TableCell className="text-right">{stat.userCount}</TableCell>
-                          <TableCell className="text-right">{formatNumber(stat.inputTokens)}</TableCell>
-                          <TableCell className="text-right">{formatNumber(stat.outputTokens)}</TableCell>
-                        </TableRow>
-                        {expandedDate === stat.date && (
-                          <TableRow>
-                            <TableCell colSpan={5} className="p-0">
-                              <div className="bg-muted/30 p-4">
-                                {loadingUsers === stat.date ? (
-                                  <div className="flex justify-center py-4">
-                                    <Loader2 className="h-5 w-5 animate-spin" />
-                                  </div>
-                                ) : (
-                                  <UserDetailsTable users={userDetails[stat.date] || []} />
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </TableBody>
-                </Table>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold">{stats.templates}</div>
+                <p className="text-sm text-muted-foreground">Recipe Templates</p>
               </CardContent>
             </Card>
-          </>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold">{stats.guestUsers}</div>
+                <p className="text-sm text-muted-foreground">Guest Users</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="text-2xl font-bold">{stats.recipes}</div>
+                <p className="text-sm text-muted-foreground">User Recipes</p>
+              </CardContent>
+            </Card>
+          </div>
         )}
+
+        {/* Recipe Templates */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Recipe Templates</CardTitle>
+              <Button size="sm" onClick={handleAdd}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Template
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+                <p className="text-sm text-muted-foreground">Loading templates...</p>
+              </div>
+            ) : templates.length === 0 ? (
+              <div className="text-center py-8">
+                <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground mb-4">No recipe templates yet</p>
+                <Button onClick={handleAdd}>Add Your First Template</Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {templates.map((template) => (
+                  <Card key={template.id} className="hover:shadow-md transition-shadow">
+                    <CardContent className="p-4">
+                      <div className="flex gap-3">
+                        {template.photo ? (
+                          <img
+                            src={template.photo.startsWith('/') ? `http://localhost:3003${template.photo}` : template.photo}
+                            alt={template.name}
+                            className="w-12 h-12 rounded-lg object-cover bg-muted flex-shrink-0"
+                            onError={(e) => {
+                              console.error('Image failed to load:', template.photo);
+                              e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect fill="%23ddd" width="48" height="48"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="10"%3ENo image%3C/text%3E%3C/svg%3E';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                            <BookOpen className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                            <h3 className="font-semibold text-lg">{template.name}</h3>
+                            <div className="flex -mr-2 flex-shrink-0">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                onClick={() => handleEdit(template)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setDeleteId(template.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="space-y-1 mt-1">
+                            <p className="text-sm">{template.dose}g : {template.water}g ({template.ratio})</p>
+                            <p className="text-sm">{template.temperature}°C • {template.brewTime}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <TemplateDialog
+          open={templateDialogOpen}
+          onOpenChange={setTemplateDialogOpen}
+          template={editingTemplate}
+          adminKey={adminKey}
+          onSave={handleSave}
+        />
+
+        <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Template</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this recipe template? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => deleteId && handleDelete(deleteId)}>
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
-  );
-}
-
-function UserDetailsTable({ users }: { users: UserDetails[] }) {
-  if (users.length === 0) return <p className="text-muted-foreground text-sm">No users found</p>;
-  
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Email</TableHead>
-          <TableHead>Registered</TableHead>
-          <TableHead className="text-center" title="Beans (AI)">🫘🤖</TableHead>
-          <TableHead className="text-center" title="Beans (Manual)">🫘✏️</TableHead>
-          <TableHead className="text-center" title="Grinders">⚙️</TableHead>
-          <TableHead className="text-center" title="Brewers">☕</TableHead>
-          <TableHead className="text-center" title="Servers">🫖</TableHead>
-          <TableHead className="text-center" title="Recipes">📖</TableHead>
-          <TableHead className="text-center" title="Templates">📝</TableHead>
-          <TableHead className="text-center" title="Brew History">📊</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {users.map((user) => (
-          <TableRow key={user.id}>
-            <TableCell className="font-mono text-xs">{user.email}</TableCell>
-            <TableCell className="text-xs">{new Date(user.registeredAt).toLocaleString()}</TableCell>
-            <TableCell className="text-center">{user.beansAI}</TableCell>
-            <TableCell className="text-center">{user.beansManual}</TableCell>
-            <TableCell className="text-center">{user.grinders}</TableCell>
-            <TableCell className="text-center">{user.brewers}</TableCell>
-            <TableCell className="text-center">{user.servers}</TableCell>
-            <TableCell className="text-center">{user.recipes}</TableCell>
-            <TableCell className="text-center">{user.brewTemplates}</TableCell>
-            <TableCell className="text-center">{user.brewHistory}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
   );
 }

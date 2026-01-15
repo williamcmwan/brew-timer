@@ -1,68 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { api, setAuthToken, clearAuth, getAuthToken } from "@/lib/api";
-
-export interface User {
-  id: number;
-  email: string;
-  name: string;
-  authProvider?: string;
-  avatarUrl?: string;
-  isGuest?: boolean;
-  isAdmin?: boolean;
-}
-
-// Guest user limits
-export const GUEST_LIMITS = {
-  beans: 2,
-  grinders: 2,
-  brewers: 2,
-  servers: 2,
-  recipes: 2,
-  templates: 2,
-  brews: 2,
-};
-
-export interface BrewTemplate {
-  id: string;
-  name: string;
-  fields: BrewTemplateField[];
-}
-
-export interface BrewTemplateField {
-  id: string;
-  label: string;
-  type: "text" | "number" | "rating" | "select";
-  required: boolean;
-  options?: string[];
-}
-
-export interface BrewNotes {
-  templateId?: string;
-  fields: Record<string, any>;
-}
-
-export interface Grinder {
-  id: string;
-  model: string;
-  photo?: string;
-  burrType: "conical" | "flat";
-  idealFor: "pour-over" | "espresso" | "both";
-}
-
-export interface Brewer {
-  id: string;
-  model: string;
-  photo?: string;
-  type: "espresso" | "pour-over";
-}
-
-export interface CoffeeServer {
-  id: string;
-  model: string;
-  photo?: string;
-  maxVolume?: number;
-  emptyWeight?: number;
-}
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { api } from "@/lib/api";
 
 export interface RecipeStep {
   description: string;
@@ -73,398 +10,249 @@ export interface RecipeStep {
 export interface Recipe {
   id: string;
   name: string;
-  grinderId: string;
-  brewerId: string;
   ratio: string;
   dose: number;
   photo?: string;
   process: string;
   processSteps?: RecipeStep[];
-  grindSize: number;
   water: number;
-  yield: number;
   temperature: number;
   brewTime: string;
   favorite?: boolean;
+  templateId?: string;
 }
 
-export interface CoffeeBatch {
+export interface RecipeTemplate {
   id: string;
-  price: number;
-  roastDate: string;
-  weight: number;
-  currentWeight: number;
-  purchaseDate: string;
-  notes?: string;
-  isActive: boolean;
-}
-
-export interface CoffeeBean {
-  id: string;
-  photo?: string;
   name: string;
-  roaster: string;
-  country: string;
-  region: string;
-  altitude: string;
-  varietal: string;
-  process: string;
-  roastLevel: string;
-  roastFor: "pour-over" | "espresso" | "";
-  tastingNotes: string;
-  url?: string;
-  batches: CoffeeBatch[];
-  favorite?: boolean;
-  lowStockThreshold?: number;
-  source?: "ai" | "manual";
-}
-
-export interface Brew {
-  id: string;
-  date: string;
-  coffeeBeanId: string;
-  batchId: string;
-  grinderId: string;
-  brewerId: string;
-  recipeId: string;
-  coffeeServerId?: string;
+  ratio: string;
   dose: number;
-  grindSize: number;
+  photo?: string;
+  process: string;
+  processSteps?: RecipeStep[];
   water: number;
-  yield: number;
   temperature: number;
   brewTime: string;
-  tds?: number;
-  extractionYield?: number;
-  rating?: number;
-  comment?: string;
-  photo?: string;
-  favorite?: boolean;
-  templateNotes?: BrewNotes;
 }
 
 interface AppContextType {
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, confirmPassword: string, name: string) => Promise<void>;
-  socialLogin: (provider: 'google' | 'apple', idToken: string) => Promise<void>;
-  guestLogin: () => Promise<void>;
-  changePassword: (currentPassword: string, newPassword: string, confirmNewPassword: string) => Promise<void>;
-  logout: () => void;
-  isGuest: boolean;
-  guestLimitReached: (type: keyof typeof GUEST_LIMITS) => boolean;
-  grinders: Grinder[];
-  addGrinder: (grinder: Omit<Grinder, "id">) => Promise<void>;
-  updateGrinder: (id: string, grinder: Partial<Grinder>) => Promise<void>;
-  deleteGrinder: (id: string) => Promise<void>;
-  brewers: Brewer[];
-  addBrewer: (brewer: Omit<Brewer, "id">) => Promise<void>;
-  updateBrewer: (id: string, brewer: Partial<Brewer>) => Promise<void>;
-  deleteBrewer: (id: string) => Promise<void>;
   recipes: Recipe[];
+  templates: RecipeTemplate[];
   addRecipe: (recipe: Omit<Recipe, "id">) => Promise<void>;
   updateRecipe: (id: string, recipe: Partial<Recipe>) => Promise<void>;
   deleteRecipe: (id: string) => Promise<void>;
   toggleRecipeFavorite: (id: string) => Promise<void>;
-  coffeeBeans: CoffeeBean[];
-  addCoffeeBean: (bean: Omit<CoffeeBean, "id">) => Promise<void>;
-  updateCoffeeBean: (id: string, bean: Partial<CoffeeBean>) => Promise<void>;
-  deleteCoffeeBean: (id: string) => Promise<void>;
-  toggleCoffeeBeanFavorite: (id: string) => Promise<void>;
-  brews: Brew[];
-  addBrew: (brew: Omit<Brew, "id">) => Promise<Brew>;
-  updateBrew: (id: string, brew: Partial<Brew>) => Promise<void>;
-  deleteBrew: (id: string) => Promise<void>;
-  toggleBrewFavorite: (id: string) => Promise<void>;
-  brewTemplates: BrewTemplate[];
-  addBrewTemplate: (template: Omit<BrewTemplate, "id">) => Promise<void>;
-  updateBrewTemplate: (id: string, template: Partial<BrewTemplate>) => Promise<void>;
-  deleteBrewTemplate: (id: string) => Promise<void>;
-  coffeeServers: CoffeeServer[];
-  addCoffeeServer: (server: Omit<CoffeeServer, "id">) => Promise<void>;
-  updateCoffeeServer: (id: string, server: Partial<CoffeeServer>) => Promise<void>;
-  deleteCoffeeServer: (id: string) => Promise<void>;
+  createFromTemplate: (templateId: string, name?: string) => Promise<void>;
+  isLoading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Initialize user from localStorage synchronously to prevent flash
-const getInitialUser = (): User | null => {
-  try {
-    const storedUser = localStorage.getItem("user");
-    const storedToken = getAuthToken();
-    if (storedUser && storedToken) {
-      return JSON.parse(storedUser);
-    }
-  } catch (e) {
-    console.error('Failed to parse stored user:', e);
+// Default recipes for the timer app
+const DEFAULT_RECIPES: Recipe[] = [
+  {
+    id: "1",
+    name: "V60 Pour Over",
+    ratio: "1:16",
+    dose: 22,
+    process: "Pour over method with V60",
+    processSteps: [
+      { description: "Bloom", waterAmount: 44, duration: 30 },
+      { description: "First pour", waterAmount: 132, duration: 60 },
+      { description: "Second pour", waterAmount: 176, duration: 90 },
+      { description: "Final pour", waterAmount: 176, duration: 120 }
+    ],
+    water: 352,
+    temperature: 93,
+    brewTime: "4:00",
+    favorite: true
+  },
+  {
+    id: "2", 
+    name: "Chemex Classic",
+    ratio: "1:15",
+    dose: 30,
+    process: "Chemex pour over method",
+    processSteps: [
+      { description: "Bloom", waterAmount: 60, duration: 45 },
+      { description: "First pour", waterAmount: 150, duration: 90 },
+      { description: "Second pour", waterAmount: 150, duration: 150 },
+      { description: "Final pour", waterAmount: 90, duration: 210 }
+    ],
+    water: 450,
+    temperature: 94,
+    brewTime: "5:30",
+    favorite: false
+  },
+  {
+    id: "3",
+    name: "French Press",
+    ratio: "1:12",
+    dose: 30,
+    process: "Immersion brewing method",
+    processSteps: [
+      { description: "Add all water", waterAmount: 360, duration: 0 },
+      { description: "Steep", waterAmount: 0, duration: 240 }
+    ],
+    water: 360,
+    temperature: 95,
+    brewTime: "4:00",
+    favorite: false
   }
-  return null;
-};
+];
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(getInitialUser);
-  const [grinders, setGrinders] = useState<Grinder[]>([]);
-  const [brewers, setBrewers] = useState<Brewer[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [coffeeBeans, setCoffeeBeans] = useState<CoffeeBean[]>([]);
-  const [brews, setBrews] = useState<Brew[]>([]);
-  const [brewTemplates, setBrewTemplates] = useState<BrewTemplate[]>([]);
-  const [coffeeServers, setCoffeeServers] = useState<CoffeeServer[]>([]);
+  const [templates, setTemplates] = useState<RecipeTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = useCallback(async () => {
-    try {
-      const [grindersData, brewersData, recipesData, beansData, brewsData, templatesData, serversData] = 
-        await Promise.all([
-          api.grinders.list(),
-          api.brewers.list(),
-          api.recipes.list(),
-          api.coffeeBeans.list(),
-          api.brews.list(),
-          api.brewTemplates.list(),
-          api.coffeeServers.list().catch(() => []),
+  // Load recipes and templates from API with localStorage fallback
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Load templates and recipes in parallel
+        const [apiTemplates, apiRecipes] = await Promise.all([
+          api.recipes.getTemplates(),
+          api.recipes.list()
         ]);
-      setGrinders(grindersData.map((g: any) => ({ ...g, id: String(g.id) })));
-      setBrewers(brewersData.map((b: any) => ({ ...b, id: String(b.id) })));
-      setRecipes(recipesData);
-      setCoffeeBeans(beansData);
-      setBrews(brewsData);
-      setBrewTemplates(templatesData);
-      setCoffeeServers(serversData);
-    } catch (error) {
-      console.error('Failed to load data:', error);
-      // If we get an auth error, clear the user state
-      if (error instanceof Error && error.message.includes('Session expired')) {
-        setUser(null);
+        
+        setTemplates(apiTemplates);
+        setRecipes(apiRecipes);
+        
+        // Save to localStorage as backup
+        if (apiRecipes.length > 0) {
+          localStorage.setItem("coffee-timer-recipes", JSON.stringify(apiRecipes));
+        }
+        if (apiTemplates.length > 0) {
+          localStorage.setItem("coffee-timer-templates", JSON.stringify(apiTemplates));
+        }
+      } catch (error) {
+        console.warn("Failed to load data from API, falling back to localStorage:", error);
+        
+        // Fallback to localStorage
+        const storedRecipes = localStorage.getItem("coffee-timer-recipes");
+        const storedTemplates = localStorage.getItem("coffee-timer-templates");
+        
+        if (storedRecipes) {
+          try {
+            setRecipes(JSON.parse(storedRecipes));
+          } catch (parseError) {
+            console.error("Failed to parse stored recipes:", parseError);
+            setRecipes(DEFAULT_RECIPES);
+          }
+        } else {
+          setRecipes(DEFAULT_RECIPES);
+        }
+        
+        if (storedTemplates) {
+          try {
+            setTemplates(JSON.parse(storedTemplates));
+          } catch (parseError) {
+            console.error("Failed to parse stored templates:", parseError);
+            setTemplates([]);
+          }
+        }
+      } finally {
+        setIsLoading(false);
       }
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    loadData();
   }, []);
 
+  // Save recipes to localStorage whenever recipes change
   useEffect(() => {
-    if (user) {
-      loadData();
-    } else {
-      setIsLoading(false);
+    if (!isLoading && recipes.length > 0) {
+      localStorage.setItem("coffee-timer-recipes", JSON.stringify(recipes));
     }
-  }, [user, loadData]);
-
-  const login = async (email: string, password: string) => {
-    const userData = await api.auth.login(email, password);
-    const userWithoutToken = { ...userData };
-    delete (userWithoutToken as any).token;
-    setUser(userWithoutToken);
-    localStorage.setItem("user", JSON.stringify(userWithoutToken));
-    localStorage.setItem("userId", String(userData.id));
-    await loadData();
-  };
-
-  const signup = async (email: string, password: string, confirmPassword: string, name: string) => {
-    const userData = await api.auth.signup(email, password, confirmPassword, name);
-    const userWithoutToken = { ...userData };
-    delete (userWithoutToken as any).token;
-    setUser(userWithoutToken);
-    localStorage.setItem("user", JSON.stringify(userWithoutToken));
-    localStorage.setItem("userId", String(userData.id));
-  };
-
-  const changePassword = async (currentPassword: string, newPassword: string, confirmNewPassword: string) => {
-    await api.auth.changePassword(currentPassword, newPassword, confirmNewPassword);
-  };
-
-  const socialLogin = async (provider: 'google' | 'apple', idToken: string) => {
-    const userData = await api.auth.social(provider, idToken);
-    const userWithoutToken = { ...userData };
-    delete (userWithoutToken as any).token;
-    setUser(userWithoutToken);
-    localStorage.setItem("user", JSON.stringify(userWithoutToken));
-    localStorage.setItem("userId", String(userData.id));
-    await loadData();
-  };
-
-  const getOrCreateDeviceId = (): string => {
-    let deviceId = localStorage.getItem("guestDeviceId");
-    if (!deviceId) {
-      deviceId = crypto.randomUUID() + '-' + Date.now().toString(36);
-      localStorage.setItem("guestDeviceId", deviceId);
-    }
-    return deviceId;
-  };
-
-  const guestLogin = async () => {
-    const deviceId = getOrCreateDeviceId();
-    const userData = await api.auth.guest(deviceId);
-    const userWithoutToken = { ...userData, isGuest: true };
-    delete (userWithoutToken as any).token;
-    setUser(userWithoutToken);
-    localStorage.setItem("user", JSON.stringify(userWithoutToken));
-    localStorage.setItem("userId", String(userData.id));
-    await loadData();
-  };
-
-  const isGuest = user?.authProvider === 'guest' || user?.isGuest === true;
-
-  const guestLimitReached = (type: keyof typeof GUEST_LIMITS): boolean => {
-    if (!isGuest) return false;
-    const counts: Record<keyof typeof GUEST_LIMITS, number> = {
-      beans: coffeeBeans.length,
-      grinders: grinders.length,
-      brewers: brewers.length,
-      servers: coffeeServers.length,
-      recipes: recipes.length,
-      templates: brewTemplates.length,
-      brews: brews.length,
-    };
-    return counts[type] >= GUEST_LIMITS[type];
-  };
-
-  const logout = () => {
-    setUser(null);
-    setGrinders([]);
-    setBrewers([]);
-    setRecipes([]);
-    setCoffeeBeans([]);
-    setBrews([]);
-    setBrewTemplates([]);
-    setCoffeeServers([]);
-    clearAuth();
-  };
-
-  const addGrinder = async (grinder: Omit<Grinder, "id">) => {
-    const newGrinder = await api.grinders.create(grinder);
-    setGrinders(prev => [...prev, { ...newGrinder, id: String(newGrinder.id) }]);
-  };
-
-  const updateGrinder = async (id: string, grinder: Partial<Grinder>) => {
-    await api.grinders.update(id, grinder);
-    setGrinders(prev => prev.map(g => g.id === id ? { ...g, ...grinder } : g));
-  };
-
-  const deleteGrinder = async (id: string) => {
-    await api.grinders.delete(id);
-    setGrinders(prev => prev.filter(g => g.id !== id));
-  };
-
-  const addBrewer = async (brewer: Omit<Brewer, "id">) => {
-    const newBrewer = await api.brewers.create(brewer);
-    setBrewers(prev => [...prev, { ...newBrewer, id: String(newBrewer.id) }]);
-  };
-
-  const updateBrewer = async (id: string, brewer: Partial<Brewer>) => {
-    await api.brewers.update(id, brewer);
-    setBrewers(prev => prev.map(b => b.id === id ? { ...b, ...brewer } : b));
-  };
-
-  const deleteBrewer = async (id: string) => {
-    await api.brewers.delete(id);
-    setBrewers(prev => prev.filter(b => b.id !== id));
-  };
+  }, [recipes, isLoading]);
 
   const addRecipe = async (recipe: Omit<Recipe, "id">) => {
-    const newRecipe = await api.recipes.create(recipe);
-    setRecipes(prev => [...prev, newRecipe]);
+    const newRecipe = {
+      ...recipe,
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 11)
+    };
+
+    try {
+      // Try API first
+      const createdRecipe = await api.recipes.create(newRecipe);
+      setRecipes(prev => [...prev, createdRecipe]);
+    } catch (error) {
+      console.warn("Failed to create recipe via API, using local storage:", error);
+      // Fallback to local state
+      setRecipes(prev => [...prev, newRecipe]);
+    }
   };
 
   const updateRecipe = async (id: string, recipe: Partial<Recipe>) => {
-    await api.recipes.update(id, recipe);
-    setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...recipe } : r));
+    try {
+      // Try API first
+      await api.recipes.update(id, recipe);
+      setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...recipe } : r));
+    } catch (error) {
+      console.warn("Failed to update recipe via API, using local storage:", error);
+      // Fallback to local state
+      setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...recipe } : r));
+    }
   };
 
   const deleteRecipe = async (id: string) => {
-    await api.recipes.delete(id);
-    setRecipes(prev => prev.filter(r => r.id !== id));
+    try {
+      // Try API first
+      await api.recipes.delete(id);
+      setRecipes(prev => prev.filter(r => r.id !== id));
+    } catch (error) {
+      console.warn("Failed to delete recipe via API, using local storage:", error);
+      // Fallback to local state
+      setRecipes(prev => prev.filter(r => r.id !== id));
+    }
   };
 
   const toggleRecipeFavorite = async (id: string) => {
-    await api.recipes.toggleFavorite(id);
-    setRecipes(prev => prev.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r));
+    try {
+      // Try API first
+      await api.recipes.toggleFavorite(id);
+      setRecipes(prev => prev.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r));
+    } catch (error) {
+      console.warn("Failed to toggle favorite via API, using local storage:", error);
+      // Fallback to local state
+      setRecipes(prev => prev.map(r => r.id === id ? { ...r, favorite: !r.favorite } : r));
+    }
   };
 
-  const addCoffeeBean = async (bean: Omit<CoffeeBean, "id">) => {
-    const newBean = await api.coffeeBeans.create(bean);
-    setCoffeeBeans(prev => [...prev, newBean]);
-  };
-
-  const updateCoffeeBean = async (id: string, bean: Partial<CoffeeBean>) => {
-    await api.coffeeBeans.update(id, bean);
-    setCoffeeBeans(prev => prev.map(b => b.id === id ? { ...b, ...bean } : b));
-  };
-
-  const deleteCoffeeBean = async (id: string) => {
-    await api.coffeeBeans.delete(id);
-    setCoffeeBeans(prev => prev.filter(b => b.id !== id));
-  };
-
-  const toggleCoffeeBeanFavorite = async (id: string) => {
-    await api.coffeeBeans.toggleFavorite(id);
-    setCoffeeBeans(prev => prev.map(b => b.id === id ? { ...b, favorite: !b.favorite } : b));
-  };
-
-  const addBrew = async (brew: Omit<Brew, "id">): Promise<Brew> => {
-    const newBrew = await api.brews.create(brew);
-    setBrews(prev => [newBrew, ...prev]);
-    return newBrew;
-  };
-
-  const updateBrew = async (id: string, brew: Partial<Brew>) => {
-    await api.brews.update(id, brew);
-    setBrews(prev => prev.map(b => b.id === id ? { ...b, ...brew } : b));
-  };
-
-  const deleteBrew = async (id: string) => {
-    await api.brews.delete(id);
-    setBrews(prev => prev.filter(b => b.id !== id));
-  };
-
-  const toggleBrewFavorite = async (id: string) => {
-    await api.brews.toggleFavorite(id);
-    setBrews(prev => prev.map(b => b.id === id ? { ...b, favorite: !b.favorite } : b));
-  };
-
-  const addBrewTemplate = async (template: Omit<BrewTemplate, "id">) => {
-    const newTemplate = await api.brewTemplates.create(template);
-    setBrewTemplates(prev => [...prev, newTemplate]);
-  };
-
-  const updateBrewTemplate = async (id: string, template: Partial<BrewTemplate>) => {
-    await api.brewTemplates.update(id, template);
-    setBrewTemplates(prev => prev.map(t => t.id === id ? { ...t, ...template } : t));
-  };
-
-  const deleteBrewTemplate = async (id: string) => {
-    await api.brewTemplates.delete(id);
-    setBrewTemplates(prev => prev.filter(t => t.id !== id));
-  };
-
-  const addCoffeeServer = async (server: Omit<CoffeeServer, "id">) => {
-    const newServer = await api.coffeeServers.create(server);
-    setCoffeeServers(prev => [...prev, { ...newServer, id: String(newServer.id) }]);
-  };
-
-  const updateCoffeeServer = async (id: string, server: Partial<CoffeeServer>) => {
-    await api.coffeeServers.update(id, server);
-    setCoffeeServers(prev => prev.map(s => s.id === id ? { ...s, ...server } : s));
-  };
-
-  const deleteCoffeeServer = async (id: string) => {
-    await api.coffeeServers.delete(id);
-    setCoffeeServers(prev => prev.filter(s => s.id !== id));
+  const createFromTemplate = async (templateId: string, name?: string) => {
+    try {
+      // Try API first
+      const createdRecipe = await api.recipes.createFromTemplate(templateId, name);
+      setRecipes(prev => [...prev, createdRecipe]);
+    } catch (error) {
+      console.warn("Failed to create recipe from template via API:", error);
+      // Fallback: find template and create locally
+      const template = templates.find(t => t.id === templateId);
+      if (template) {
+        const newRecipe: Recipe = {
+          ...template,
+          id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
+          name: name || template.name,
+          favorite: false,
+          templateId
+        };
+        setRecipes(prev => [...prev, newRecipe]);
+      }
+    }
   };
 
   return (
     <AppContext.Provider
       value={{
-        user, login, signup, socialLogin, guestLogin, changePassword, logout,
-        isGuest, guestLimitReached,
-        grinders, addGrinder, updateGrinder, deleteGrinder,
-        brewers, addBrewer, updateBrewer, deleteBrewer,
-        recipes, addRecipe, updateRecipe, deleteRecipe, toggleRecipeFavorite,
-        coffeeBeans, addCoffeeBean, updateCoffeeBean, deleteCoffeeBean, toggleCoffeeBeanFavorite,
-        brews, addBrew, updateBrew, deleteBrew, toggleBrewFavorite,
-        brewTemplates, addBrewTemplate, updateBrewTemplate, deleteBrewTemplate,
-        coffeeServers, addCoffeeServer, updateCoffeeServer, deleteCoffeeServer,
+        recipes,
+        templates,
+        addRecipe,
+        updateRecipe,
+        deleteRecipe,
+        toggleRecipeFavorite,
+        createFromTemplate,
+        isLoading,
       }}
     >
       {children}

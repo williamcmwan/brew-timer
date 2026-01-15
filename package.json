@@ -1,13 +1,15 @@
 {
-  "name": "brew-journal",
+  "name": "coffee-brew-timer",
   "version": "1.0.0",
   "private": true,
+  "description": "A simple, focused coffee brewing timer application",
   "scripts": {
-    "dev:client": "cd client && npm run dev",
+    "dev": "cd client && npm run dev",
     "dev:server": "cd server && npm run dev",
-    "build": "./scripts/deploy.sh",
-    "start": "./scripts/app.sh start",
-    "stop": "./scripts/app.sh stop",
-    "restart": "./scripts/app.sh restart"
+    "build": "./build.sh",
+    "preview": "cd client && npm run preview",
+    "seed": "cd server && npm run seed",
+    "migrate": "cd server && npm run migrate",
+    "copy-images": "cd server && npm run copy-images"
   }
 }
