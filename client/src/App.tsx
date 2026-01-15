@@ -9,6 +9,8 @@ import Dashboard from "./pages/Dashboard";
 import Recipes from "./pages/Recipes";
 import BrewTimer from "./pages/BrewTimer";
 import Admin from "./pages/Admin";
+import Contact from "./pages/Contact";
+import Privacy from "./pages/Privacy";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,7 +28,9 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/recipes" element={<Recipes />} />
               <Route path="/brew-timer" element={<BrewTimer />} />
-              <Route path="/admin" element={<Admin />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/secret-admin-panel-2024" element={<Admin />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

@@ -5,6 +5,7 @@ export interface RecipeStep {
   description: string;
   waterAmount: number;
   duration: number;
+  flowRate?: number; // Optional custom flow rate (g/s)
 }
 
 export interface Recipe {
@@ -119,19 +120,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTemplates(apiTemplates);
         setRecipes(apiRecipes);
         
-        // Save to localStorage as backup
+        // Save recipes to localStorage as backup (but not templates - they should always be fresh from server)
         if (apiRecipes.length > 0) {
           localStorage.setItem("coffee-timer-recipes", JSON.stringify(apiRecipes));
-        }
-        if (apiTemplates.length > 0) {
-          localStorage.setItem("coffee-timer-templates", JSON.stringify(apiTemplates));
         }
       } catch (error) {
         console.warn("Failed to load data from API, falling back to localStorage:", error);
         
-        // Fallback to localStorage
+        // Fallback to localStorage for recipes only
         const storedRecipes = localStorage.getItem("coffee-timer-recipes");
-        const storedTemplates = localStorage.getItem("coffee-timer-templates");
         
         if (storedRecipes) {
           try {
@@ -144,14 +141,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setRecipes(DEFAULT_RECIPES);
         }
         
-        if (storedTemplates) {
-          try {
-            setTemplates(JSON.parse(storedTemplates));
-          } catch (parseError) {
-            console.error("Failed to parse stored templates:", parseError);
-            setTemplates([]);
-          }
-        }
+        // Templates should always come from server, so leave empty if API fails
+        setTemplates([]);
       } finally {
         setIsLoading(false);
       }

@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, X, Copy } from "lucide-react";
 import type { Recipe, RecipeStep, RecipeTemplate } from "@/contexts/AppContext";
@@ -70,8 +69,6 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
   const {
     register,
     handleSubmit,
-    setValue,
-    watch,
     reset,
     formState: { errors },
   } = useForm<RecipeFormData>({
@@ -174,36 +171,48 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
     }
   };
 
-  const updateStep = (index: number, field: keyof RecipeStep, value: string | number) => {
+  const updateStep = (index: number, field: keyof RecipeStep, value: string | number | undefined) => {
     const newSteps = [...processSteps];
-    newSteps[index] = { ...newSteps[index], [field]: value };
+    if (value === undefined) {
+      // Remove the field if value is undefined
+      const { [field]: _, ...rest } = newSteps[index];
+      newSteps[index] = rest as RecipeStep;
+    } else {
+      newSteps[index] = { ...newSteps[index], [field]: value };
+    }
     setProcessSteps(newSteps);
   };
 
-  const handleCopyFromTemplate = (template: RecipeTemplate) => {
-    setValue("name", template.name);
-    setValue("ratio", template.ratio);
-    setValue("dose", template.dose);
-    setValue("photo", template.photo || "");
-    setValue("process", template.process || "");
-    setValue("water", template.water);
-    setValue("temperature", template.temperature);
-    setValue("brewTime", template.brewTime);
-    
-    if (template.processSteps && template.processSteps.length > 0) {
-      setProcessSteps([...template.processSteps]);
-      const inputs: Record<number, string> = {};
-      template.processSteps.forEach((step, index) => {
-        inputs[index] = formatDuration(step.duration);
+  const handleCopyFromTemplate = async (template: RecipeTemplate) => {
+    // Directly create recipe from template without opening the form
+    try {
+      const recipeData = {
+        name: template.name,
+        ratio: template.ratio,
+        dose: template.dose,
+        photo: template.photo || "",
+        process: template.process || "",
+        water: template.water,
+        temperature: template.temperature,
+        brewTime: template.brewTime,
+        // Spread all step properties to ensure nothing is lost
+        processSteps: template.processSteps ? template.processSteps.map(step => ({ ...step })) : []
+      };
+
+      await addRecipe(recipeData as Omit<Recipe, "id">);
+      toast({ 
+        title: "Recipe added", 
+        description: `"${template.name}" has been added to your recipes`
       });
-      setElapsedTimeInputs(inputs);
+      onOpenChange(false);
+      reset();
+    } catch (error) {
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to add recipe",
+        variant: "destructive"
+      });
     }
-    
-    setShowTemplatePicker(false);
-    toast({ 
-      title: "Copied", 
-      description: `Copied "${template.name}" settings.`
-    });
   };
 
   return (
@@ -223,7 +232,7 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
                 onClick={() => setShowTemplatePicker(!showTemplatePicker)}
               >
                 <Copy className="h-4 w-4 mr-2" />
-                Copy from templates
+                Add from templates
               </Button>
               {showTemplatePicker && (
                 <div className="border rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto bg-muted/50">
@@ -238,7 +247,14 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
                     >
                       <div className="flex items-center gap-2 w-full">
                         {template.photo ? (
-                          <img src={template.photo} alt={template.name} className="w-8 h-8 rounded object-cover shrink-0" />
+                          <img 
+                            src={template.photo.startsWith('/') ? `http://localhost:3003${template.photo}` : template.photo} 
+                            alt={template.name} 
+                            className="w-8 h-8 rounded object-cover shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                         ) : (
                           <div className="w-8 h-8 rounded bg-muted flex items-center justify-center text-xs text-muted-foreground shrink-0">—</div>
                         )}
@@ -347,6 +363,37 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
                         }}
                       />
                     </div>
+                  </div>
+                  {/* Flow Rate field - optional override */}
+                  <div className="mt-2">
+                    <Label className="text-xs">Flow Rate (g/s) - Optional</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      placeholder={(() => {
+                        // step.waterAmount is per-step water
+                        // step.duration is cumulative elapsed time (not per-step!)
+                        const currentElapsed = step.duration || 0;
+                        const previousElapsed = index > 0 ? (processSteps[index - 1]?.duration || 0) : 0;
+                        const stepDuration = currentElapsed - previousElapsed;
+                        const stepWater = step.waterAmount || 0;
+                        return stepWater && stepDuration ? (stepWater / stepDuration).toFixed(1) : "Auto";
+                      })()}
+                      value={step.flowRate ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        updateStep(index, "flowRate", val ? parseFloat(val) : undefined);
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Leave empty for auto-calculated ({(() => {
+                        const currentElapsed = step.duration || 0;
+                        const previousElapsed = index > 0 ? (processSteps[index - 1]?.duration || 0) : 0;
+                        const stepDuration = currentElapsed - previousElapsed;
+                        const stepWater = step.waterAmount || 0;
+                        return stepWater && stepDuration ? (stepWater / stepDuration).toFixed(1) : '0';
+                      })()} g/s)
+                    </p>
                   </div>
                 </div>
               ))}

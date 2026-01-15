@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Shield, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { BuyMeCoffee } from "@/components/BuyMeCoffee";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,7 +26,7 @@ export default function Admin() {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   
-  const [adminKey, setAdminKey] = useState(searchParams.get('key') || 'coffee-admin-2024');
+  const [adminKey, setAdminKey] = useState(searchParams.get('key') || '');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [templates, setTemplates] = useState<RecipeTemplate[]>([]);
   const [stats, setStats] = useState<any>(null);
@@ -78,9 +79,6 @@ export default function Admin() {
     if (keyFromUrl && !isAuthenticated) {
       setAdminKey(keyFromUrl);
       authenticate(keyFromUrl);
-    } else if (adminKey === 'coffee-admin-2024' && !isAuthenticated) {
-      // Auto-authenticate with default key for testing
-      authenticate(adminKey);
     }
   }, [searchParams, isAuthenticated]);
 
@@ -184,9 +182,12 @@ export default function Admin() {
             </Button>
             <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           </div>
-          <Button onClick={() => setIsAuthenticated(false)} variant="outline">
-            Logout
-          </Button>
+          <div className="flex items-center gap-2">
+            <BuyMeCoffee />
+            <Button onClick={() => setIsAuthenticated(false)} variant="outline">
+              Logout
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}

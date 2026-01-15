@@ -18,6 +18,9 @@ server/.pid
 .env.local
 .env.*.local
 
+# Admin access reference (contains sensitive info)
+.admin-access.md
+
 # IDE
 .idea/
 .vscode/

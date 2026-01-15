@@ -10,7 +10,11 @@ A simple, focused coffee brewing timer application that helps you brew perfect c
 - **Local Storage**: All recipes stored locally in your browser - no login required
 - **Mobile Friendly**: Optimized for mobile devices and touch interfaces
 - **Audio Feedback**: Sound notifications for step transitions and countdown alerts
-- **Admin Panel**: Manage recipe templates for all users
+- **Admin Panel**: Manage recipe templates for all users (hidden, accessible via special URL)
+- **Buy Me a Coffee**: Support button integrated on all pages
+- **Cookie Notice**: GDPR-friendly cookie consent banner with privacy policy link
+- **Contact Form**: EmailJS-powered contact form with reCAPTCHA spam protection
+- **Privacy Policy**: Comprehensive privacy policy page explaining data practices
 
 ## Quick Start
 
@@ -182,11 +186,31 @@ CMD ["node", "dist/index.js"]
 ### For Administrators
 
 **Access Admin Panel:**
+
+The admin panel is hidden from regular users and accessible via a special URL:
+
 ```
-http://localhost:5173/admin?key=your-admin-key
+http://localhost:5173/secret-admin-panel-2024
 ```
 
-Default admin key: `coffee-admin-2024` (change via `ADMIN_KEY` environment variable)
+Or with auto-authentication:
+```
+http://localhost:5173/secret-admin-panel-2024?key=your-admin-key
+```
+
+**Production URL:**
+```
+https://yourdomain.com/secret-admin-panel-2024?key=your-admin-key
+```
+
+Default admin key: `coffee-admin-2024` (change via `ADMIN_KEY` environment variable in server/.env)
+
+**Security Notes:**
+- The admin panel is not linked from any public page
+- Requires admin key authentication
+- Consider changing the URL path in production for additional security
+- Use a strong admin key in production
+- Consider IP restrictions for production deployments
 
 **Admin Features:**
 - View statistics (templates, users, recipes)
@@ -232,17 +256,64 @@ interface RecipeStep {
 
 ## Environment Configuration
 
-### Server (.env)
+All environment variables are configured in the root `.env` file.
+
+### Root .env
 ```bash
+# Admin key for template management
+ADMIN_KEY=coffee-admin-2024
+
+# API URL for the coffee timer backend
+VITE_API_URL=http://localhost:3003
+
+# Buy Me a Coffee username
+VITE_BUYMEACOFFEE_USERNAME=yourusername
+
+# EmailJS Configuration (for contact form)
+VITE_EMAILJS_SERVICE_ID=your_service_id
+VITE_EMAILJS_TEMPLATE_ID=your_template_id
+VITE_EMAILJS_PUBLIC_KEY=your_public_key
+
+# Google reCAPTCHA v2 (for contact form)
+VITE_RECAPTCHA_SITE_KEY=your_site_key
+
+# Server port
 PORT=3003
-ADMIN_KEY=your-secure-admin-key
+
+# Node environment
 NODE_ENV=production
 ```
 
-### Client (client/.env)
-```bash
-VITE_API_URL=http://localhost:3003
-```
+**Buy Me a Coffee Setup:**
+1. Create an account at [buymeacoffee.com](https://www.buymeacoffee.com/)
+2. Get your username from your profile URL (e.g., `buymeacoffee.com/yourusername`)
+3. Set `VITE_BUYMEACOFFEE_USERNAME` in root `.env`
+4. The button will appear on all pages with the official Buy Me a Coffee design
+
+**Contact Form Setup:**
+
+*EmailJS Configuration:*
+1. Create account at [emailjs.com](https://www.emailjs.com/)
+2. Add an email service (Gmail, Outlook, etc.)
+3. Create an email template with these variables:
+   - `{{from_name}}` - Sender's name
+   - `{{from_email}}` - Sender's email
+   - `{{subject}}` - Message subject
+   - `{{message}}` - Message content
+4. Copy your Service ID, Template ID, and Public Key
+5. Set the values in root `.env`:
+   - `VITE_EMAILJS_SERVICE_ID`
+   - `VITE_EMAILJS_TEMPLATE_ID`
+   - `VITE_EMAILJS_PUBLIC_KEY`
+
+*reCAPTCHA Configuration:*
+1. Go to [Google reCAPTCHA Admin](https://www.google.com/recaptcha/admin)
+2. Register a new site with reCAPTCHA v2 "I'm not a robot" Checkbox
+3. Add your domains (localhost for development)
+4. Copy the Site Key
+5. Set `VITE_RECAPTCHA_SITE_KEY` in root `.env`
+
+The contact form is accessible at `/contact` and includes spam protection via reCAPTCHA.
 
 ## Technology Stack
 

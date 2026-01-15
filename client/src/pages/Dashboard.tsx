@@ -4,9 +4,11 @@ import { useApp } from "@/contexts/AppContext";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Coffee, Star, Loader2, Shield, Timer, Pencil, Plus, Trash2 } from "lucide-react";
+import { Coffee, Star, Loader2, Timer, Pencil, Plus, Trash2, Mail, Shield } from "lucide-react";
 import { RecipeDialog } from "@/components/equipment/RecipeDialog";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { BuyMeCoffee } from "@/components/BuyMeCoffee";
+import { CookieNotice } from "@/components/CookieNotice";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,17 +74,19 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background">
       <div className="container max-w-lg mx-auto p-4 space-y-4">
-        <div className="flex items-center justify-between pt-2">
-          <div className="flex items-center gap-3">
-            <div className="rounded-full bg-primary/10 p-2">
+        {/* Header with Buy Me a Coffee */}
+        <div className="flex items-center justify-between pt-2 gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="rounded-full bg-primary/10 p-2 shrink-0">
               <Coffee className="h-6 w-6 text-primary" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h1 className="text-2xl font-bold text-foreground">Coffee Timer</h1>
-              <p className="text-sm text-muted-foreground">Select a recipe to start brewing</p>
+              <p className="text-sm text-muted-foreground truncate">Select a recipe to start brewing</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
+            <BuyMeCoffee />
             <ThemeToggle />
           </div>
         </div>
@@ -282,64 +286,28 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Admin Access */}
-        <Card className="border-amber-500/50 bg-amber-500/5">
-          <CardContent className="p-4 flex items-center gap-3">
-            <Shield className="h-6 w-6 text-amber-500" />
-            <div className="flex-1">
-              <p className="font-medium">Admin Panel</p>
-              <p className="text-xs text-muted-foreground">Manage recipe templates</p>
-            </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={async () => {
-                try {
-                  console.log('Testing API connectivity...');
-                  
-                  // Test regular recipes endpoint first
-                  const recipesData = await api.recipes.list();
-                  console.log('Recipes API works:', recipesData.length, 'recipes');
-                  
-                  // Test templates endpoint
-                  const templatesData = await api.recipes.getTemplates();
-                  console.log('Templates API works:', templatesData.length, 'templates');
-                  console.log('Template photos:', templatesData.filter(t => t.photo).map(t => ({ name: t.name, photo: t.photo })));
-                  
-                  // Test admin endpoint
-                  const adminData = await api.admin.getStats('coffee-admin-2024');
-                  console.log('Admin API works:', adminData);
-                  
-                  // Test image loading
-                  const templatesWithPhotos = templatesData.filter(t => t.photo);
-                  if (templatesWithPhotos.length > 0) {
-                    const testImage = templatesWithPhotos[0];
-                    console.log('Testing image load:', testImage.photo);
-                    
-                    const img = new Image();
-                    img.onload = () => console.log('✅ Image loads successfully:', testImage.photo);
-                    img.onerror = (e) => console.error('❌ Image failed to load:', testImage.photo, e);
-                    img.src = testImage.photo;
-                  }
-                  
-                  alert(`API test successful!\nRecipes: ${recipesData.length}\nTemplates: ${templatesData.length}\nWith photos: ${templatesData.filter(t => t.photo).length}\nCheck console for details.`);
-                } catch (error) {
-                  console.error('API test failed:', error);
-                  alert('API test failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
-                }
-              }}
-            >
-              Test API
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate("/admin")}
-            >
-              Access
-            </Button>
-          </CardContent>
-        </Card>
+        {/* Contact Us Link */}
+        <div className="text-center pb-4 space-x-4">
+          <Button
+            variant="link"
+            size="sm"
+            onClick={() => navigate("/contact")}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Mail className="h-4 w-4 mr-2" />
+            Contact Us
+          </Button>
+          <span className="text-muted-foreground">·</span>
+          <Button
+            variant="link"
+            size="sm"
+            onClick={() => navigate("/privacy")}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Shield className="h-4 w-4 mr-2" />
+            Privacy Policy
+          </Button>
+        </div>
       </div>
 
       <RecipeDialog
@@ -365,6 +333,9 @@ export default function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Cookie Notice */}
+      <CookieNotice />
     </div>
   );
 }

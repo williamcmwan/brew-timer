@@ -6,13 +6,8 @@ export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
 
   const toggleTheme = () => {
-    if (theme === "light") {
-      setTheme("dark");
-    } else if (theme === "dark") {
-      setTheme("system");
-    } else {
-      setTheme("light");
-    }
+    // Simple toggle between light and dark only
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   return (

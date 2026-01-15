@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Timer, Star, Filter, Copy, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RecipeDialog } from "@/components/equipment/RecipeDialog";
+import { BuyMeCoffee } from "@/components/BuyMeCoffee";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -79,9 +80,12 @@ export default function Recipes() {
             </Button>
             <h1 className="text-2xl font-bold">Recipes</h1>
           </div>
-          <Button onClick={handleAdd} size="icon">
-            <Plus className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <BuyMeCoffee />
+            <Button onClick={handleAdd} size="icon">
+              <Plus className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
 
         {recipes.length > 0 && (
@@ -165,7 +169,6 @@ export default function Recipes() {
                         </div>
                       </div>
                       <div className="space-y-1 mt-1">
-                        <p className="text-sm">Grind: {recipe.grindSize}</p>
                         <p className="text-sm">{recipe.dose}g : {recipe.water}g ({recipe.ratio})</p>
                         <p className="text-sm">{recipe.temperature}°C • {recipe.brewTime}</p>
                       </div>

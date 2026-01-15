@@ -254,9 +254,15 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
     }
   };
 
-  const updateStep = (index: number, field: keyof RecipeStep, value: string | number) => {
+  const updateStep = (index: number, field: keyof RecipeStep, value: string | number | undefined) => {
     const newSteps = [...processSteps];
-    newSteps[index] = { ...newSteps[index], [field]: value };
+    if (value === undefined) {
+      // Remove the field if value is undefined
+      const { [field]: _, ...rest } = newSteps[index];
+      newSteps[index] = rest as RecipeStep;
+    } else {
+      newSteps[index] = { ...newSteps[index], [field]: value };
+    }
     setProcessSteps(newSteps);
   };
 
@@ -409,6 +415,37 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
                         }}
                       />
                     </div>
+                  </div>
+                  {/* Flow Rate field - optional override */}
+                  <div className="mt-2">
+                    <Label className="text-xs">Flow Rate (g/s) - Optional</Label>
+                    <Input
+                      type="number"
+                      step="0.1"
+                      placeholder={(() => {
+                        // step.waterAmount is per-step water
+                        // step.duration is cumulative elapsed time (not per-step!)
+                        const currentElapsed = step.duration || 0;
+                        const previousElapsed = index > 0 ? (processSteps[index - 1]?.duration || 0) : 0;
+                        const stepDuration = currentElapsed - previousElapsed;
+                        const stepWater = step.waterAmount || 0;
+                        return stepWater && stepDuration ? (stepWater / stepDuration).toFixed(1) : "Auto";
+                      })()}
+                      value={step.flowRate ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        updateStep(index, "flowRate", val ? parseFloat(val) : undefined);
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Leave empty for auto-calculated ({(() => {
+                        const currentElapsed = step.duration || 0;
+                        const previousElapsed = index > 0 ? (processSteps[index - 1]?.duration || 0) : 0;
+                        const stepDuration = currentElapsed - previousElapsed;
+                        const stepWater = step.waterAmount || 0;
+                        return stepWater && stepDuration ? (stepWater / stepDuration).toFixed(1) : '0';
+                      })()} g/s)
+                    </p>
                   </div>
                 </div>
               ))}
