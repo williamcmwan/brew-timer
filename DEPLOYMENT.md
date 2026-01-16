@@ -133,6 +133,63 @@ server {
 
 ### Troubleshooting
 
+**Quick Diagnostics:**
+```bash
+# Run the image serving diagnostic script
+./scripts/check-images.sh
+```
+
+This will check:
+- If image directories exist and contain files
+- If the server is running
+- If image endpoints are responding
+- File permissions
+
+**Recipe photos not showing in production:**
+
+This happens when images uploaded locally aren't transferred to production. Here's how to fix it:
+
+1. **Check if images directory exists on production:**
+   ```bash
+   ls -la server/data/recipe-images/
+   ```
+
+2. **If directory is empty, images need to be uploaded again:**
+   - Option A: Re-upload images through the app UI in production
+   - Option B: Transfer images from local to production:
+     ```bash
+     # On your local machine, create a backup
+     tar -czf recipe-images-backup.tar.gz server/data/recipe-images/
+     
+     # Transfer to production server
+     scp recipe-images-backup.tar.gz user@your-server:/path/to/coffee-brew-timer/
+     
+     # On production server, extract
+     cd /path/to/coffee-brew-timer
+     tar -xzf recipe-images-backup.tar.gz
+     ```
+
+3. **Verify images are being served:**
+   ```bash
+   # Check server logs for image serving message
+   ./scripts/app.sh logs | grep "Serving recipe images"
+   
+   # Test image access directly
+   curl -I http://localhost:3005/recipe-images/[filename].jpg
+   ```
+
+4. **Check file permissions:**
+   ```bash
+   # Ensure the server can read the images
+   chmod -R 755 server/data/recipe-images/
+   ```
+
+**Important Notes:**
+- Recipe images are stored in `server/data/recipe-images/` on the filesystem
+- These images are NOT in git (they're in .gitignore)
+- When deploying to a new server, you need to transfer existing images manually
+- Consider using cloud storage (S3, Cloudinary) for production if you need persistence across deployments
+
 **"Cannot GET /" error:**
 - This means the server isn't serving the React app
 - Make sure you ran `./scripts/deploy.sh` to build both client and server
@@ -166,6 +223,38 @@ tar -czf backup-$(date +%Y%m%d).tar.gz server/data/
 
 # Restore
 tar -xzf backup-YYYYMMDD.tar.gz
+```
+
+### AWS/Cloud Deployment Considerations
+
+**Persistent Storage:**
+- The `server/data/` directory contains user-uploaded images and the database
+- On AWS EC2: This directory persists across app restarts but NOT across instance replacements
+- For production, consider:
+  - Using an EBS volume mounted to `server/data/`
+  - Or migrating to cloud storage (S3) for images
+  - Using RDS or managed database for the SQLite database
+
+**Image Storage Options:**
+
+1. **Current Setup (Filesystem):**
+   - Images stored in `server/data/recipe-images/`
+   - Simple but not scalable for multiple servers
+   - Requires manual backup/transfer
+
+2. **AWS S3 (Recommended for production):**
+   - Modify upload endpoints to save to S3
+   - Update image URLs to use S3 URLs
+   - Provides durability and CDN capabilities
+   - See AWS S3 documentation for implementation
+
+**Environment Variables for Production:**
+```bash
+# Add to your .env file on production
+NODE_ENV=production
+PORT=3005
+ADMIN_KEY=your-secure-admin-key
+ALLOWED_ORIGINS=https://your-domain.com
 ```
 
 ### Security Checklist

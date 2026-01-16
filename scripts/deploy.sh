@@ -30,10 +30,14 @@ echo ""
 echo "=== Building client ==="
 npm run build
 
-# Create data directory if it doesn't exist
+# Create data directory structure if it doesn't exist
 echo ""
 echo "=== Setting up data directory ==="
-mkdir -p "$PROJECT_ROOT/server/data"
+mkdir -p "$PROJECT_ROOT/server/data/recipe-images"
+mkdir -p "$PROJECT_ROOT/server/data/template-images"
+echo "Created data directories:"
+echo "  - $PROJECT_ROOT/server/data/recipe-images"
+echo "  - $PROJECT_ROOT/server/data/template-images"
 
 echo ""
 echo "=== Deployment complete! ==="
