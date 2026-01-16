@@ -90,6 +90,22 @@ git pull
 ./scripts/app.sh logs
 ```
 
+### Helper Scripts
+
+```bash
+# Check image serving status
+./scripts/check-images.sh
+
+# Backup recipe images
+./scripts/sync-images.sh backup
+
+# Upload images to production
+./scripts/sync-images.sh upload user@server:/path/to/app
+
+# Download images from production
+./scripts/sync-images.sh download user@server:/path/to/app
+```
+
 ### File Structure in Production
 
 ```
@@ -155,19 +171,36 @@ This happens when images uploaded locally aren't transferred to production. Here
    ```
 
 2. **If directory is empty, images need to be uploaded again:**
-   - Option A: Re-upload images through the app UI in production
-   - Option B: Transfer images from local to production:
-     ```bash
-     # On your local machine, create a backup
-     tar -czf recipe-images-backup.tar.gz server/data/recipe-images/
-     
-     # Transfer to production server
-     scp recipe-images-backup.tar.gz user@your-server:/path/to/coffee-brew-timer/
-     
-     # On production server, extract
-     cd /path/to/coffee-brew-timer
-     tar -xzf recipe-images-backup.tar.gz
-     ```
+   
+   **Option A: Use the sync script (easiest):**
+   ```bash
+   # On your local machine
+   ./scripts/sync-images.sh upload ec2-user@your-server:/path/to/app
+   
+   # Then on production server
+   ssh ec2-user@your-server
+   cd /path/to/app
+   tar -xzf recipe-images-upload-*.tar.gz
+   chmod -R 755 server/data/recipe-images/
+   ./scripts/app.sh restart
+   ```
+   
+   **Option B: Manual transfer:**
+   ```bash
+   # On your local machine, create a backup
+   tar -czf recipe-images-backup.tar.gz server/data/recipe-images/
+   
+   # Transfer to production server
+   scp recipe-images-backup.tar.gz user@your-server:/path/to/coffee-brew-timer/
+   
+   # On production server, extract
+   cd /path/to/coffee-brew-timer
+   tar -xzf recipe-images-backup.tar.gz
+   chmod -R 755 server/data/recipe-images/
+   ./scripts/app.sh restart
+   ```
+   
+   **Option C: Re-upload through the app UI**
 
 3. **Verify images are being served:**
    ```bash

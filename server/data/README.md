@@ -1,70 +1,119 @@
-# Data Directory Structure
+# Data Directory
 
-This directory contains the application's data files.
+This directory contains all user data for the Coffee Brew Timer application.
 
-## Directory Structure
+## Structure
 
 ```
 data/
-├── coffee-timer.db          # SQLite database (not in git)
-├── template-images/         # Recipe template images (IN git)
-│   └── *.jpg, *.png        # Template photos uploaded via admin panel
-└── recipe-images/          # User recipe images (not in git)
-    └── *.jpg, *.png        # Photos uploaded by users
+├── coffee-timer.db          # SQLite database (auto-created)
+├── recipe-images/           # User-uploaded recipe photos
+│   └── *.jpg, *.png
+└── template-images/         # Admin template photos (in git)
+    └── *.jpg, *.png
 ```
 
-## What's Tracked in Git
+## Important Notes
 
-- ✅ `template-images/` - Template images are included in version control
-- ❌ `coffee-timer.db` - Database is excluded (environment-specific)
-- ❌ `recipe-images/` - User uploads are excluded (user-specific data)
+### Recipe Images (`recipe-images/`)
+- **NOT in git** (excluded via .gitignore)
+- Contains user-uploaded photos
+- Must be backed up separately
+- When deploying to production, these files need to be transferred manually
 
-## Production Deployment
+### Template Images (`template-images/`)
+- **IN git** (committed to repository)
+- Contains admin-created template photos
+- Automatically deployed with code
 
-### Option 1: Template Images in Git (Recommended)
+### Database (`coffee-timer.db`)
+- **NOT in git** (excluded via .gitignore)
+- Auto-created on first run
+- Contains all recipes, equipment, and user data
+- Must be backed up separately
 
-Template images are automatically deployed with your code:
+## Deployment to AWS/Production
 
+When deploying to a new server:
+
+1. **First deployment:**
+   ```bash
+   # Directories are created automatically by deploy.sh
+   ./scripts/deploy.sh
+   ```
+
+2. **Migrating existing data:**
+   ```bash
+   # On your local/source server
+   tar -czf data-backup.tar.gz server/data/
+   
+   # Transfer to production
+   scp data-backup.tar.gz user@production-server:/path/to/app/
+   
+   # On production server
+   cd /path/to/app
+   tar -xzf data-backup.tar.gz
+   chmod -R 755 server/data/
+   ```
+
+3. **Verify images are accessible:**
+   ```bash
+   ./scripts/check-images.sh
+   ```
+
+## Backup Strategy
+
+### Manual Backup
 ```bash
-git add server/data/template-images/
-git commit -m "Add recipe template images"
-git push
+# Create backup
+tar -czf backup-$(date +%Y%m%d).tar.gz server/data/
+
+# Restore
+tar -xzf backup-YYYYMMDD.tar.gz
 ```
 
-On production server:
+### Automated Backup (Recommended)
+Set up a cron job:
 ```bash
-git pull
-./scripts/deploy.sh
-./scripts/app.sh start
+# Add to crontab (daily backup at 2 AM)
+0 2 * * * cd /path/to/app && tar -czf backups/backup-$(date +\%Y\%m\%d).tar.gz server/data/
 ```
 
-### Option 2: Manual Copy
+## AWS Considerations
 
-If you prefer not to track images in git, copy them manually:
+### Option 1: EBS Volume (Simple)
+- Mount an EBS volume to `server/data/`
+- Provides persistence across instance restarts
+- Easy to snapshot for backups
 
-```bash
-# From local machine
-scp -r server/data/template-images/ user@server:/path/to/app/server/data/
+### Option 2: S3 Storage (Scalable)
+- Modify upload endpoints to save directly to S3
+- Store image URLs in database instead of local paths
+- Provides durability and CDN capabilities
+- Requires code changes to upload/serve from S3
 
-# On production server
-./scripts/app.sh restart
-```
+### Option 3: Hybrid
+- Keep database on EBS
+- Store images in S3
+- Best of both worlds for production
 
-## Adding New Template Images
+## Troubleshooting
 
-1. Go to Admin panel (http://your-domain.com/admin)
-2. Add/edit recipe templates with photos
-3. Images are automatically saved to `server/data/template-images/`
-4. Commit and push if using Option 1 above
+**Images not showing:**
+1. Check directory exists: `ls -la server/data/recipe-images/`
+2. Check permissions: `chmod -R 755 server/data/`
+3. Check server logs: `./scripts/app.sh logs | grep "Serving recipe images"`
+4. Test endpoint: `curl -I http://localhost:3005/recipe-images/[filename]`
 
-## Backup
+**Database issues:**
+1. Check file exists: `ls -la server/data/coffee-timer.db`
+2. Check permissions: `chmod 644 server/data/coffee-timer.db`
+3. Reset database: Stop app, delete database file, restart
 
-To backup your data:
+## Security
 
-```bash
-# Backup database
-cp server/data/coffee-timer.db server/data/coffee-timer.db.backup
-
-# Backup all data
-tar -czf data-backup.tar.gz server/data/
-```
+- Never commit `coffee-timer.db` to git (contains user data)
+- Never commit `recipe-images/` to git (user-uploaded content)
+- Keep `.env` file secure (contains admin keys)
+- Regularly backup this directory
+- Use appropriate file permissions (755 for directories, 644 for files)

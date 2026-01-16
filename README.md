@@ -99,7 +99,18 @@ npm run build
 
 # View logs
 ./scripts/app.sh logs
+
+# Check image serving status
+./scripts/check-images.sh
+
+# Sync recipe images to/from production
+./scripts/sync-images.sh backup
+./scripts/sync-images.sh upload user@server:/path/to/app
 ```
+
+**Important:** Recipe images are stored in `server/data/recipe-images/` and are NOT in git. When deploying to production, you need to transfer existing images manually. See [AWS-IMAGE-FIX.md](AWS-IMAGE-FIX.md) for details.
+
+For complete deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Deployment Options
 
