@@ -121,7 +121,7 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground">
                       {recipe.dose}g • {recipe.ratio} • {recipe.temperature}°C • {recipe.brewTime}
                     </p>
-                    <div className="flex items-center gap-0.5 mt-2">
+                    <div className="flex items-center gap-1 mt-2 flex-wrap">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -129,8 +129,8 @@ export default function Dashboard() {
                         onClick={(e) => handleToggleFavorite(recipe.id, e)}
                         title="Remove from favorites"
                       >
-                        <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500 mr-0.5" />
-                        <span className="text-xs">Favorite</span>
+                        <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500 sm:mr-1" />
+                        <span className="text-xs hidden sm:inline">Favorite</span>
                       </Button>
                       <Button
                         variant="ghost"
@@ -139,8 +139,8 @@ export default function Dashboard() {
                         onClick={(e) => handleEdit(recipe, e)}
                         title="Edit recipe"
                       >
-                        <Pencil className="h-3.5 w-3.5 mr-0.5" />
-                        <span className="text-xs">Edit</span>
+                        <Pencil className="h-3.5 w-3.5 sm:mr-1" />
+                        <span className="text-xs hidden sm:inline">Edit</span>
                       </Button>
                       <Button
                         variant="ghost"
@@ -152,8 +152,8 @@ export default function Dashboard() {
                         }}
                         title="Delete recipe"
                       >
-                        <Trash2 className="h-3.5 w-3.5 mr-0.5" />
-                        <span className="text-xs">Delete</span>
+                        <Trash2 className="h-3.5 w-3.5 sm:mr-1" />
+                        <span className="text-xs hidden sm:inline">Delete</span>
                       </Button>
                       <Button
                         variant="ghost"
@@ -165,8 +165,8 @@ export default function Dashboard() {
                         }}
                         title="Start timer"
                       >
-                        <Timer className="h-3.5 w-3.5 mr-0.5" />
-                        <span className="text-xs">Start</span>
+                        <Timer className="h-3.5 w-3.5 sm:mr-1" />
+                        <span className="text-xs hidden sm:inline">Start</span>
                       </Button>
                     </div>
                   </div>
@@ -230,7 +230,7 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground">
                         {recipe.dose}g • {recipe.ratio} • {recipe.temperature}°C • {recipe.brewTime}
                       </p>
-                      <div className="flex items-center gap-0.5 mt-2">
+                      <div className="flex items-center gap-1 mt-2 flex-wrap">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -238,8 +238,8 @@ export default function Dashboard() {
                           onClick={(e) => handleToggleFavorite(recipe.id, e)}
                           title={recipe.favorite ? "Remove from favorites" : "Add to favorites"}
                         >
-                          <Star className={`h-3.5 w-3.5 mr-0.5 ${recipe.favorite ? "fill-yellow-500 text-yellow-500" : ""}`} />
-                          <span className="text-xs">Favorite</span>
+                          <Star className={`h-3.5 w-3.5 sm:mr-1 ${recipe.favorite ? "fill-yellow-500 text-yellow-500" : ""}`} />
+                          <span className="text-xs hidden sm:inline">Favorite</span>
                         </Button>
                         <Button
                           variant="ghost"
@@ -248,8 +248,8 @@ export default function Dashboard() {
                           onClick={(e) => handleEdit(recipe, e)}
                           title="Edit recipe"
                         >
-                          <Pencil className="h-3.5 w-3.5 mr-0.5" />
-                          <span className="text-xs">Edit</span>
+                          <Pencil className="h-3.5 w-3.5 sm:mr-1" />
+                          <span className="text-xs hidden sm:inline">Edit</span>
                         </Button>
                         <Button
                           variant="ghost"
@@ -261,8 +261,8 @@ export default function Dashboard() {
                           }}
                           title="Delete recipe"
                         >
-                          <Trash2 className="h-3.5 w-3.5 mr-0.5" />
-                          <span className="text-xs">Delete</span>
+                          <Trash2 className="h-3.5 w-3.5 sm:mr-1" />
+                          <span className="text-xs hidden sm:inline">Delete</span>
                         </Button>
                         <Button
                           variant="ghost"
@@ -274,8 +274,8 @@ export default function Dashboard() {
                           }}
                           title="Start timer"
                         >
-                          <Timer className="h-3.5 w-3.5 mr-0.5" />
-                          <span className="text-xs">Start</span>
+                          <Timer className="h-3.5 w-3.5 sm:mr-1" />
+                          <span className="text-xs hidden sm:inline">Start</span>
                         </Button>
                       </div>
                     </div>
