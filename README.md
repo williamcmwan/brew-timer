@@ -2,6 +2,13 @@
 
 A simple, focused coffee brewing timer application that helps you brew perfect coffee every time.
 
+## Documentation
+
+- **[README.md](README.md)** - Project overview and features (you are here)
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Complete deployment guide
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Common issues and fixes
+- **[server/data/README.md](server/data/README.md)** - Data directory structure
+
 ## Features
 
 - **Recipe Management**: Create and manage your favorite coffee brewing recipes
@@ -68,114 +75,33 @@ npm run dev
 
 ## Production Deployment
 
-### Build the Application
+See [DEPLOYMENT.md](DEPLOYMENT.md) for complete deployment instructions and [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for common issues.
+
+### Quick Deploy
 
 ```bash
-# Build client
-cd client
-npm install
-npm run build
-
-# Build server
-cd server
-npm install
-npm run build
-```
-
-### Deployment Scripts
-
-```bash
-# Full deployment (builds both client and server)
+# Build and deploy
 ./scripts/deploy.sh
 
 # Start the application
 ./scripts/app.sh start
 
-# Stop the application
-./scripts/app.sh stop
-
 # Check status
 ./scripts/app.sh status
-
-# View logs
-./scripts/app.sh logs
-
-# Check image serving status
 ./scripts/check-images.sh
-
-# Sync recipe images to/from production
-./scripts/sync-images.sh backup
-./scripts/sync-images.sh upload user@server:/path/to/app
 ```
 
-**Important:** Recipe images are stored in `server/data/recipe-images/` and are NOT in git. When deploying to production, you need to transfer existing images manually. See [AWS-IMAGE-FIX.md](AWS-IMAGE-FIX.md) for details.
+### Helper Scripts
 
-For complete deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
-
-### Deployment Options
-
-#### 1. Static Hosting (Client Only)
-
-**Netlify / Vercel:**
-1. Connect your GitHub repository
-2. Set build command: `cd client && npm run build`
-3. Set publish directory: `client/dist`
-4. Deploy
-
-**GitHub Pages:**
 ```bash
-cd client && npm run build
-# Copy contents of client/dist/ to your GitHub Pages repository
+./scripts/app.sh [start|stop|restart|status|logs]  # App management
+./scripts/check-images.sh                          # Image diagnostics
+./scripts/diagnose-photos.sh                       # Detailed photo check
+./scripts/sync-images.sh [backup|upload|download]  # Image sync
+./scripts/fix-photo-paths.sh                       # Fix database paths
 ```
 
-#### 2. Self-Hosted with Server
-
-**Using the deployment script:**
-```bash
-./scripts/deploy.sh
-./scripts/app.sh start
-```
-
-**Manual deployment:**
-```bash
-# Build
-cd client && npm run build
-cd ../server && npm run build
-
-# Start server (serves both API and static files)
-cd server
-node dist/index.js
-```
-
-#### 3. Docker
-
-```dockerfile
-FROM node:18-alpine as builder
-
-# Build client
-WORKDIR /app/client
-COPY client/package*.json ./
-RUN npm ci
-COPY client/ ./
-RUN npm run build
-
-# Build server
-WORKDIR /app/server
-COPY server/package*.json ./
-RUN npm ci
-COPY server/ ./
-RUN npm run build
-
-# Production image
-FROM node:18-alpine
-WORKDIR /app
-COPY --from=builder /app/server/dist ./dist
-COPY --from=builder /app/server/node_modules ./node_modules
-COPY --from=builder /app/client/dist ./public
-
-EXPOSE 3003
-CMD ["node", "dist/index.js"]
-```
+**Important:** Recipe images are stored in `server/data/recipe-images/` and are NOT in git. When deploying to production, you may need to transfer images manually. See [DEPLOYMENT.md](DEPLOYMENT.md) for details.
 
 ## Recipe Templates System
 

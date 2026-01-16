@@ -1,5 +1,18 @@
 # Deployment Guide
 
+## Quick Start
+
+```bash
+# Deploy to production
+git pull
+./scripts/deploy.sh
+./scripts/app.sh start
+
+# Check status
+./scripts/app.sh status
+./scripts/check-images.sh
+```
+
 ## Production Deployment
 
 ### Prerequisites
@@ -93,17 +106,24 @@ git pull
 ### Helper Scripts
 
 ```bash
-# Check image serving status
-./scripts/check-images.sh
+# Application management
+./scripts/app.sh start          # Start server
+./scripts/app.sh stop           # Stop server
+./scripts/app.sh restart        # Restart server
+./scripts/app.sh status         # Check status
+./scripts/app.sh logs           # View logs
 
-# Backup recipe images
-./scripts/sync-images.sh backup
+# Diagnostics
+./scripts/check-images.sh       # Quick image check
+./scripts/diagnose-photos.sh    # Comprehensive photo diagnostics
 
-# Upload images to production
-./scripts/sync-images.sh upload user@server:/path/to/app
+# Image management
+./scripts/sync-images.sh backup                    # Backup images
+./scripts/sync-images.sh upload user@server:/path  # Upload to server
+./scripts/sync-images.sh download user@server:/path # Download from server
 
-# Download images from production
-./scripts/sync-images.sh download user@server:/path/to/app
+# Database fixes
+./scripts/fix-photo-paths.sh    # Fix incorrect photo URLs in database
 ```
 
 ### File Structure in Production
@@ -149,79 +169,55 @@ server {
 
 ### Troubleshooting
 
-**Quick Diagnostics:**
+#### Quick Diagnostics
 ```bash
-# Run the image serving diagnostic script
-./scripts/check-images.sh
+# Run comprehensive diagnostics
+./scripts/diagnose-photos.sh
+
+# Check server status
+./scripts/app.sh status
+
+# View logs
+./scripts/app.sh logs | tail -50
 ```
 
-This will check:
-- If image directories exist and contain files
-- If the server is running
-- If image endpoints are responding
-- File permissions
+#### Recipe Photos Not Showing
 
-**Recipe photos not showing in production:**
+**Symptom:** Photos work locally but not in production.
 
-This happens when images uploaded locally aren't transferred to production. Here's how to fix it:
+**Common Causes:**
+1. **Wrong database paths** - Photos stored with `http://localhost:3005` prefix
+2. **Missing files** - Images not transferred to production
+3. **Permission issues** - Server can't read files
 
-1. **Check if images directory exists on production:**
-   ```bash
-   ls -la server/data/recipe-images/
-   ```
+**Solution:**
 
-2. **If directory is empty, images need to be uploaded again:**
-   
-   **Option A: Use the sync script (easiest):**
-   ```bash
-   # On your local machine
-   ./scripts/sync-images.sh upload ec2-user@your-server:/path/to/app
-   
-   # Then on production server
-   ssh ec2-user@your-server
-   cd /path/to/app
-   tar -xzf recipe-images-upload-*.tar.gz
-   chmod -R 755 server/data/recipe-images/
-   ./scripts/app.sh restart
-   ```
-   
-   **Option B: Manual transfer:**
-   ```bash
-   # On your local machine, create a backup
-   tar -czf recipe-images-backup.tar.gz server/data/recipe-images/
-   
-   # Transfer to production server
-   scp recipe-images-backup.tar.gz user@your-server:/path/to/coffee-brew-timer/
-   
-   # On production server, extract
-   cd /path/to/coffee-brew-timer
-   tar -xzf recipe-images-backup.tar.gz
-   chmod -R 755 server/data/recipe-images/
-   ./scripts/app.sh restart
-   ```
-   
-   **Option C: Re-upload through the app UI**
+```bash
+# 1. Run diagnostics to identify the issue
+./scripts/diagnose-photos.sh
 
-3. **Verify images are being served:**
-   ```bash
-   # Check server logs for image serving message
-   ./scripts/app.sh logs | grep "Serving recipe images"
-   
-   # Test image access directly
-   curl -I http://localhost:3005/recipe-images/[filename].jpg
-   ```
+# 2. If paths are wrong (contain localhost URLs), fix them
+./scripts/fix-photo-paths.sh
 
-4. **Check file permissions:**
-   ```bash
-   # Ensure the server can read the images
-   chmod -R 755 server/data/recipe-images/
-   ```
+# 3. If files are missing, transfer from local
+./scripts/sync-images.sh backup
+scp recipe-images-backup-*.tar.gz user@server:/path/to/app/
+# On server:
+tar -xzf recipe-images-backup-*.tar.gz
+chmod -R 755 server/data/recipe-images/
+
+# 4. Restart server
+./scripts/app.sh restart
+
+# 5. Verify
+curl -I http://localhost:3005/template-images/[filename].jpg
+```
 
 **Important Notes:**
-- Recipe images are stored in `server/data/recipe-images/` on the filesystem
-- These images are NOT in git (they're in .gitignore)
-- When deploying to a new server, you need to transfer existing images manually
-- Consider using cloud storage (S3, Cloudinary) for production if you need persistence across deployments
+- Recipe images are stored in `server/data/recipe-images/` (NOT in git)
+- Template images are stored in `server/data/template-images/` (IN git)
+- Photo paths in database should be relative: `/template-images/file.jpg`
+- NOT absolute: `http://localhost:3005/template-images/file.jpg`
 
 **"Cannot GET /" error:**
 - This means the server isn't serving the React app
