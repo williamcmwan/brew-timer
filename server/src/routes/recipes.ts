@@ -41,6 +41,55 @@ interface RequestWithGuestId extends express.Request {
   guestId: string;
 }
 
+// Seed default recipes from recipe templates for new guest user
+const seedGuestRecipes = (guestId: string) => {
+  try {
+    // Check if guest already has recipes
+    const existingRecipes = db.prepare('SELECT COUNT(*) as count FROM recipes WHERE guest_id = ?').get(guestId) as { count: number };
+    
+    if (existingRecipes.count > 0) {
+      return; // Guest already has recipes, don't seed
+    }
+
+    // Get all recipe templates
+    const templates = db.prepare('SELECT * FROM recipe_templates').all() as any[];
+    
+    if (templates.length === 0) {
+      console.log('No recipe templates found to seed');
+      return;
+    }
+
+    // Copy each template to guest's recipes
+    const insertStmt = db.prepare(`
+      INSERT INTO recipes (guest_id, name, ratio, dose, photo, process, process_steps, 
+                          grind_size, water, yield, temperature, brew_time, favorite)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    for (const template of templates) {
+      insertStmt.run(
+        guestId,
+        template.name,
+        template.ratio,
+        template.dose,
+        template.photo,
+        template.process,
+        template.process_steps,
+        null, // grind_size - no longer used
+        template.water,
+        null, // yield - no longer used
+        template.temperature,
+        template.brew_time,
+        0 // favorite - default to false
+      );
+    }
+
+    console.log(`Seeded ${templates.length} recipes for guest ${guestId}`);
+  } catch (error) {
+    console.error('Error seeding guest recipes:', error);
+  }
+};
+
 // Middleware to ensure guest user exists
 const ensureGuestUser = (req: any, res: any, next: any) => {
   const guestId = req.headers['x-guest-id'];
@@ -51,8 +100,13 @@ const ensureGuestUser = (req: any, res: any, next: any) => {
 
   // Create guest user if doesn't exist
   try {
-    const stmt = db.prepare('INSERT OR IGNORE INTO guest_users (guest_id) VALUES (?)');
-    stmt.run(guestId);
+    const result = db.prepare('INSERT OR IGNORE INTO guest_users (guest_id) VALUES (?)').run(guestId);
+    
+    // If this was a new guest user (rowsAffected > 0), seed default recipes
+    if (result.changes > 0) {
+      seedGuestRecipes(guestId);
+    }
+    
     req.guestId = guestId;
     next();
   } catch (error) {

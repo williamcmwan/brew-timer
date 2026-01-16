@@ -1,96 +1,60 @@
 import { db } from '../db/schema.js';
 
-const DEFAULT_RECIPES = [
-  {
-    guest_id: 'default',
-    name: 'V60 Pour Over',
-    ratio: '1:16',
-    dose: 22,
-    process: 'Pour over method with V60',
-    process_steps: JSON.stringify([
-      { description: "Bloom", waterAmount: 44, duration: 30 },
-      { description: "First pour", waterAmount: 132, duration: 60 },
-      { description: "Second pour", waterAmount: 176, duration: 90 },
-      { description: "Final pour", waterAmount: 176, duration: 120 }
-    ]),
-    grind_size: 20,
-    water: 352,
-    yield: 320,
-    temperature: 93,
-    brew_time: '4:00',
-    favorite: 1
-  },
-  {
-    guest_id: 'default',
-    name: 'Chemex Classic',
-    ratio: '1:15',
-    dose: 30,
-    process: 'Chemex pour over method',
-    process_steps: JSON.stringify([
-      { description: "Bloom", waterAmount: 60, duration: 45 },
-      { description: "First pour", waterAmount: 150, duration: 90 },
-      { description: "Second pour", waterAmount: 150, duration: 150 },
-      { description: "Final pour", waterAmount: 90, duration: 210 }
-    ]),
-    grind_size: 25,
-    water: 450,
-    yield: 400,
-    temperature: 94,
-    brew_time: '5:30',
-    favorite: 0
-  },
-  {
-    guest_id: 'default',
-    name: 'French Press',
-    ratio: '1:12',
-    dose: 30,
-    process: 'Immersion brewing method',
-    process_steps: JSON.stringify([
-      { description: "Add all water", waterAmount: 360, duration: 0 },
-      { description: "Steep", waterAmount: 0, duration: 240 }
-    ]),
-    grind_size: 35,
-    water: 360,
-    yield: 340,
-    temperature: 95,
-    brew_time: '4:00',
-    favorite: 0
-  }
-];
-
-export function seedDefaultRecipes() {
+/**
+ * Seeds recipes from recipe_templates table for a guest user
+ * This is now handled automatically when a new guest user is created
+ * This script is kept for manual seeding if needed
+ */
+export function seedDefaultRecipes(guestId: string = 'default') {
   try {
-    // Create default guest user
+    // Create guest user if doesn't exist
     const guestStmt = db.prepare('INSERT OR IGNORE INTO guest_users (guest_id) VALUES (?)');
-    guestStmt.run('default');
+    guestStmt.run(guestId);
 
-    // Insert default recipes
+    // Check if guest already has recipes
+    const existingRecipes = db.prepare('SELECT COUNT(*) as count FROM recipes WHERE guest_id = ?').get(guestId) as { count: number };
+    
+    if (existingRecipes.count > 0) {
+      console.log(`Guest ${guestId} already has ${existingRecipes.count} recipes, skipping seed`);
+      return;
+    }
+
+    // Get all recipe templates from admin
+    const templates = db.prepare('SELECT * FROM recipe_templates').all() as any[];
+    
+    if (templates.length === 0) {
+      console.log('⚠️  No recipe templates found in database. Please add templates via admin panel first.');
+      return;
+    }
+
+    // Copy each template to guest's recipes
     const recipeStmt = db.prepare(`
-      INSERT OR IGNORE INTO recipes (guest_id, name, ratio, dose, process, process_steps, 
-                                   grind_size, water, yield, temperature, brew_time, favorite)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO recipes (guest_id, name, ratio, dose, photo, process, process_steps, 
+                          grind_size, water, yield, temperature, brew_time, favorite)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    for (const recipe of DEFAULT_RECIPES) {
+    for (const template of templates) {
       recipeStmt.run(
-        recipe.guest_id,
-        recipe.name,
-        recipe.ratio,
-        recipe.dose,
-        recipe.process,
-        recipe.process_steps,
-        recipe.grind_size,
-        recipe.water,
-        recipe.yield,
-        recipe.temperature,
-        recipe.brew_time,
-        recipe.favorite
+        guestId,
+        template.name,
+        template.ratio,
+        template.dose,
+        template.photo,
+        template.process,
+        template.process_steps,
+        null, // grind_size - no longer used
+        template.water,
+        null, // yield - no longer used
+        template.temperature,
+        template.brew_time,
+        0 // favorite - default to false
       );
     }
 
-    console.log('✅ Default recipes seeded successfully');
+    console.log(`✅ Seeded ${templates.length} recipes from templates for guest ${guestId}`);
   } catch (error) {
-    console.error('❌ Error seeding default recipes:', error);
+    console.error('❌ Error seeding recipes from templates:', error);
   }
 }
 
