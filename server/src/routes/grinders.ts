@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { db } from '../db/schema.js';
 import { AuthRequest } from '../middleware/auth.js';
-import { grinderSchema } from '../middleware/validation.js';
+// import { grinderSchema } from '../middleware/validation.js';
 
 const router = Router();
 

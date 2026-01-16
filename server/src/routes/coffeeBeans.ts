@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { db } from '../db/schema.js';
 import { AuthRequest } from '../middleware/auth.js';
-import { coffeeBeanSchema } from '../middleware/validation.js';
+// import { coffeeBeanSchema } from '../middleware/validation.js';
 
 const router = Router();
 
