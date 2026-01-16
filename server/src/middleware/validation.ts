@@ -1,145 +1,116 @@
 import { z } from 'zod';
+import { Request, Response, NextFunction } from 'express';
 
-export const loginSchema = z.object({
-  email: z.string().email('Invalid email format').max(255),
-  password: z.string().min(1, 'Password is required').max(128),
-});
-
-export const signupSchema = z.object({
-  email: z.string().email('Invalid email format').max(255),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(128),
-  confirmPassword: z.string().min(1, 'Please confirm your password'),
-  name: z.string().min(1, 'Name is required').max(100).trim(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmPassword'],
-});
-
-export const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1, 'Current password is required'),
-  newPassword: z.string().min(6, 'New password must be at least 6 characters').max(128),
-  confirmNewPassword: z.string().min(1, 'Please confirm your new password'),
-}).refine((data) => data.newPassword === data.confirmNewPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmNewPassword'],
-});
-
-export const forgotPasswordSchema = z.object({
-  email: z.string().email('Invalid email format').max(255),
-});
-
-export const resetPasswordSchema = z.object({
-  token: z.string().min(1, 'Reset token is required'),
-  newPassword: z.string().min(6, 'Password must be at least 6 characters').max(128),
-  confirmNewPassword: z.string().min(1, 'Please confirm your password'),
-}).refine((data) => data.newPassword === data.confirmNewPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmNewPassword'],
-});
-
-export const socialLoginSchema = z.object({
-  provider: z.enum(['google']),
-  idToken: z.string().min(1, 'ID token is required'),
-});
-
-export const grinderSchema = z.object({
-  model: z.string().min(1).max(200),
-  photo: z.string().nullable().optional(),
-  burrType: z.enum(['conical', 'flat']),
-  idealFor: z.enum(['pour-over', 'espresso', 'both']),
-});
-
-export const brewerSchema = z.object({
-  model: z.string().min(1).max(200),
-  photo: z.string().nullable().optional(),
-  type: z.enum(['espresso', 'pour-over']),
-});
-
-export const coffeeServerSchema = z.object({
-  model: z.string().min(1).max(200),
-  photo: z.string().nullable().optional(),
-  maxVolume: z.number().positive().optional(),
-  emptyWeight: z.number().positive().optional(),
-});
-
-export const coffeeBeanSchema = z.object({
-  photo: z.string().nullable().optional(),
-  name: z.string().min(1).max(200),
-  roaster: z.string().max(200).optional(),
-  country: z.string().max(100).optional(),
-  region: z.string().max(100).optional(),
-  altitude: z.string().max(50).optional(),
-  varietal: z.string().max(100).optional(),
-  process: z.string().max(100).optional(),
-  roastLevel: z.string().max(50).optional(),
-  roastFor: z.enum(['pour-over', 'espresso', '']).optional(),
-  tastingNotes: z.string().max(500).optional(),
-  url: z.string().max(1000).nullable().optional(),
-  favorite: z.boolean().optional(),
-  lowStockThreshold: z.number().int().positive().nullable().optional(),
-  source: z.enum(['ai', 'manual']).optional(),
-  batches: z.array(z.object({
-    id: z.string().optional(),
-    price: z.number().min(0).optional(),
-    roastDate: z.string().max(50).optional(),
-    weight: z.number().min(0).optional(),
-    currentWeight: z.number().min(0).optional(),
-    purchaseDate: z.string().max(50).optional(),
-    notes: z.string().max(500).nullable().optional(),
-    isActive: z.boolean().optional(),
-  })).optional(),
-});
-
+// Recipe validation schema
 export const recipeSchema = z.object({
-  name: z.string().min(1).max(200),
-  grinderId: z.string().max(20).optional(),
-  brewerId: z.string().max(20).optional(),
-  ratio: z.string().max(20).optional(),
-  dose: z.number().min(0).optional(),
-  photo: z.string().nullable().optional(),
-  process: z.string().max(100).optional(),
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long').trim(),
+  ratio: z.string().regex(/^\d+:\d+$/, 'Invalid ratio format (use X:Y)'),
+  dose: z.number().min(0, 'Dose must be positive').max(1000, 'Dose too large'),
+  water: z.number().min(0, 'Water must be positive').max(10000, 'Water amount too large'),
+  temperature: z.number().min(0, 'Temperature must be positive').max(100, 'Temperature too high'),
+  brewTime: z.string().regex(/^\d+:\d+$/, 'Invalid brew time format (use MM:SS)'),
+  process: z.string().max(5000, 'Process description too long').optional(),
+  photo: z.string().url('Invalid photo URL').optional().or(z.literal('')),
   processSteps: z.array(z.object({
-    description: z.string().max(500),
-    waterAmount: z.number().min(0),
-    duration: z.number().min(0),
+    description: z.string().max(200),
+    waterAmount: z.number().min(0).max(10000),
+    duration: z.number().min(0).max(3600),
+    flowRate: z.number().min(0).max(100).optional(),
   })).optional(),
-  grindSize: z.number().min(0).optional(),
-  water: z.number().min(0).optional(),
-  yield: z.number().min(0).optional(),
-  temperature: z.number().min(0).max(100).optional(),
-  brewTime: z.string().max(20).optional(),
   favorite: z.boolean().optional(),
+  shareToCommunity: z.boolean().optional(),
+  brewingMethod: z.string().max(50).optional(),
 });
 
-export const brewSchema = z.object({
-  coffeeBeanId: z.string().optional().nullable(),
-  batchId: z.string().optional().nullable(),
-  grinderId: z.string().optional().nullable(),
-  brewerId: z.string().optional().nullable(),
-  recipeId: z.string().optional().nullable(),
-  coffeeServerId: z.string().optional().nullable(),
-  dose: z.number().optional().nullable(),
-  grindSize: z.number().optional().nullable(),
-  water: z.number().optional().nullable(),
-  yield: z.number().optional().nullable(),
-  temperature: z.number().optional().nullable(),
-  brewTime: z.string().optional().nullable(),
-  tds: z.number().optional().nullable(),
-  extractionYield: z.number().optional().nullable(),
-  rating: z.number().optional().nullable(),
-  comment: z.string().optional().nullable(),
-  photo: z.string().optional().nullable(),
-  favorite: z.boolean().optional(),
-  templateNotes: z.any().optional().nullable(),
+// Template validation schema (similar to recipe but without user-specific fields)
+export const templateSchema = z.object({
+  name: z.string().min(1).max(100).trim(),
+  ratio: z.string().regex(/^\d+:\d+$/),
+  dose: z.number().min(0).max(1000),
+  water: z.number().min(0).max(10000),
+  temperature: z.number().min(0).max(100),
+  brewTime: z.string().regex(/^\d+:\d+$/),
+  process: z.string().max(5000).optional(),
+  photo: z.string().url().optional().or(z.literal('')),
+  processSteps: z.array(z.object({
+    description: z.string().max(200),
+    waterAmount: z.number().min(0).max(10000),
+    duration: z.number().min(0).max(3600),
+    flowRate: z.number().min(0).max(100).optional(),
+  })).optional(),
+  brewingMethod: z.string().max(50).optional(),
 });
 
-export const brewTemplateSchema = z.object({
-  name: z.string().min(1).max(100),
-  fields: z.array(z.object({
-    id: z.string(),
-    label: z.string().max(100),
-    type: z.enum(['text', 'number', 'rating', 'select']),
-    required: z.boolean(),
-    options: z.array(z.string().max(100)).optional(),
-  })),
-});
+// Guest ID validation
+export const guestIdSchema = z.string()
+  .regex(/^guest-[a-f0-9-]+$/, 'Invalid guest ID format')
+  .min(10)
+  .max(100);
+
+// Admin key validation (basic format check)
+export const adminKeySchema = z.string()
+  .min(8, 'Admin key too short')
+  .max(200, 'Admin key too long');
+
+// Validation middleware factory
+export function validateRequest(schema: z.ZodSchema) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validated = schema.parse(req.body);
+      req.body = validated; // Replace with validated data
+      next();
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: error.errors.map(e => ({
+            field: e.path.join('.'),
+            message: e.message
+          }))
+        });
+      }
+      next(error);
+    }
+  };
+}
+
+// Validate guest ID from header
+export function validateGuestId(req: any, res: Response, next: NextFunction) {
+  const guestId = req.headers['x-guest-id'];
+  
+  if (!guestId) {
+    return res.status(400).json({ error: 'Guest ID required' });
+  }
+  
+  try {
+    guestIdSchema.parse(guestId);
+    req.guestId = guestId;
+    next();
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid guest ID format' });
+  }
+}
+
+// Sanitize file upload
+export function validateFileUpload(req: Request, res: Response, next: NextFunction) {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  
+  const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  const maxSize = 10 * 1024 * 1024; // 2MB
+  
+  if (!allowedMimeTypes.includes(req.file.mimetype)) {
+    return res.status(400).json({ 
+      error: 'Invalid file type. Only JPEG, PNG, and WebP images are allowed' 
+    });
+  }
+  
+  if (req.file.size > maxSize) {
+    return res.status(400).json({ 
+      error: 'File too large. Maximum size is 2MB' 
+    });
+  }
+  
+  next();
+}
