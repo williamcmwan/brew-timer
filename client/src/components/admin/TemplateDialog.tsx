@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, X } from "lucide-react";
 import type { RecipeTemplate, RecipeStep } from "@/contexts/AppContext";
@@ -21,6 +22,7 @@ const templateSchema = z.object({
   temperature: z.number({ required_error: "Temperature is required", invalid_type_error: "Temperature must be a number" })
     .min(1, "Temperature must be at least 1°C").max(100),
   brewTime: z.string().trim().min(1, "Brew time is required").max(20),
+  brewingMethod: z.string().optional().or(z.literal("")),
 });
 
 type TemplateFormData = z.infer<typeof templateSchema>;
@@ -61,6 +63,22 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
   const [elapsedTimeInputs, setElapsedTimeInputs] = useState<Record<number, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [brewingMethod, setBrewingMethod] = useState("");
+  const [customBrewingMethod, setCustomBrewingMethod] = useState("");
+
+  // Brewing method options (sorted alphabetically)
+  const brewingMethodOptions = [
+    "Aeropress",
+    "Chemex",
+    "Clever Dripper",
+    "French Press",
+    "Hario Switch",
+    "Kalita Wave",
+    "Orea",
+    "Origami",
+    "V60",
+    "Others"
+  ];
 
   const {
     register,
@@ -186,7 +204,23 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
         dose: template.dose,
         temperature: template.temperature,
         brewTime: template.brewTime,
+        brewingMethod: template.brewingMethod || "",
       });
+      
+      // Handle brewing method
+      if (template.brewingMethod) {
+        if (brewingMethodOptions.includes(template.brewingMethod)) {
+          setBrewingMethod(template.brewingMethod);
+          setCustomBrewingMethod("");
+        } else {
+          setBrewingMethod("Others");
+          setCustomBrewingMethod(template.brewingMethod);
+        }
+      } else {
+        setBrewingMethod("");
+        setCustomBrewingMethod("");
+      }
+      
       if (template.processSteps && template.processSteps.length > 0) {
         setProcessSteps([...template.processSteps]);
         const inputs: Record<number, string> = {};
@@ -197,6 +231,8 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
       }
     } else {
       reset();
+      setBrewingMethod("");
+      setCustomBrewingMethod("");
       setProcessSteps([{ description: "", waterAmount: 0, duration: 30 }]);
       setElapsedTimeInputs({ 0: "30" });
     }
@@ -205,10 +241,13 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
   const onSubmit = async (data: TemplateFormData) => {
     setIsLoading(true);
     try {
+      const finalBrewingMethod = brewingMethod === "Others" ? customBrewingMethod : brewingMethod;
+      
       const templateData = {
         ...data,
         water: calculatedWater,
-        processSteps: processSteps.filter(step => step.description.trim() !== "")
+        processSteps: processSteps.filter(step => step.description.trim() !== ""),
+        brewingMethod: finalBrewingMethod || undefined
       };
 
       if (template) {
@@ -278,6 +317,30 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
             <Label htmlFor="name">Name *</Label>
             <Input id="name" {...register("name")} placeholder="e.g., James Hoffmann V60" />
             {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="brewingMethod">Brewing Method</Label>
+            <Select value={brewingMethod} onValueChange={setBrewingMethod}>
+              <SelectTrigger id="brewingMethod">
+                <SelectValue placeholder="Select brewing method" />
+              </SelectTrigger>
+              <SelectContent>
+                {brewingMethodOptions.map((method) => (
+                  <SelectItem key={method} value={method}>
+                    {method}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {brewingMethod === "Others" && (
+              <Input
+                placeholder="Enter custom brewing method"
+                value={customBrewingMethod}
+                onChange={(e) => setCustomBrewingMethod(e.target.value)}
+                className="mt-2"
+              />
+            )}
           </div>
 
           <div className="space-y-2">

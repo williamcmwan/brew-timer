@@ -100,12 +100,10 @@ const ensureGuestUser = (req: any, res: any, next: any) => {
 
   // Create guest user if doesn't exist
   try {
-    const result = db.prepare('INSERT OR IGNORE INTO guest_users (guest_id) VALUES (?)').run(guestId);
+    db.prepare('INSERT OR IGNORE INTO guest_users (guest_id) VALUES (?)').run(guestId);
     
-    // If this was a new guest user (rowsAffected > 0), seed default recipes
-    if (result.changes > 0) {
-      seedGuestRecipes(guestId);
-    }
+    // Note: No longer auto-seeding recipes from templates
+    // Users can manually add community recipes to their collection
     
     req.guestId = guestId;
     next();
@@ -135,7 +133,7 @@ router.get('/templates', (req, res) => {
   try {
     const stmt = db.prepare(`
       SELECT id, name, ratio, dose, photo, process, process_steps, 
-             water, temperature, brew_time
+             water, temperature, brew_time, brewing_method
       FROM recipe_templates 
       ORDER BY name
     `);
@@ -151,6 +149,7 @@ router.get('/templates', (req, res) => {
         water: template.water,
         temperature: template.temperature,
         brewTime: template.brew_time, // Convert brew_time to brewTime
+        brewingMethod: template.brewing_method,
         processSteps: template.process_steps ? JSON.parse(template.process_steps) : undefined
       };
     });
@@ -181,8 +180,8 @@ router.post('/from-template/:templateId', ensureGuestUser, (req: any, res) => {
     // Create recipe from template
     const stmt = db.prepare(`
       INSERT INTO recipes (guest_id, name, ratio, dose, photo, process, process_steps, 
-                          grind_size, water, yield, temperature, brew_time)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          grind_size, water, yield, temperature, brew_time, brewing_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
@@ -197,7 +196,8 @@ router.post('/from-template/:templateId', ensureGuestUser, (req: any, res) => {
       template.water,
       null, // yield - no longer used
       template.temperature,
-      template.brew_time
+      template.brew_time,
+      template.brewing_method
     );
 
     const newRecipe = {
@@ -211,6 +211,7 @@ router.post('/from-template/:templateId', ensureGuestUser, (req: any, res) => {
       water: template.water,
       temperature: template.temperature,
       brewTime: template.brew_time,
+      brewingMethod: template.brewing_method,
       favorite: false,
       templateId: template.id.toString()
     };
@@ -227,7 +228,7 @@ router.get('/', ensureGuestUser, (req: any, res) => {
   try {
     const stmt = db.prepare(`
       SELECT id, name, ratio, dose, photo, process, process_steps, 
-             water, temperature, brew_time, favorite
+             water, temperature, brew_time, favorite, share_to_community, brewing_method
       FROM recipes 
       WHERE guest_id = ? 
       ORDER BY favorite DESC, created_at DESC
@@ -244,6 +245,8 @@ router.get('/', ensureGuestUser, (req: any, res) => {
       temperature: recipe.temperature,
       brewTime: recipe.brew_time, // Convert brew_time to brewTime
       favorite: Boolean(recipe.favorite),
+      shareToCommunity: Boolean(recipe.share_to_community),
+      brewingMethod: recipe.brewing_method,
       processSteps: recipe.process_steps ? JSON.parse(recipe.process_steps) : undefined
     }));
 
@@ -257,12 +260,12 @@ router.get('/', ensureGuestUser, (req: any, res) => {
 // Create new recipe
 router.post('/', ensureGuestUser, (req: any, res) => {
   try {
-    const { name, ratio, dose, photo, process, processSteps, water, temperature, brewTime, favorite } = req.body;
+    const { name, ratio, dose, photo, process, processSteps, water, temperature, brewTime, favorite, shareToCommunity, brewingMethod } = req.body;
     
     const stmt = db.prepare(`
       INSERT INTO recipes (guest_id, name, ratio, dose, photo, process, process_steps, 
-                          grind_size, water, yield, temperature, brew_time, favorite)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          grind_size, water, yield, temperature, brew_time, favorite, share_to_community, brewing_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     
     const result = stmt.run(
@@ -278,7 +281,9 @@ router.post('/', ensureGuestUser, (req: any, res) => {
       null, // yield - no longer used
       temperature,
       brewTime,
-      favorite ? 1 : 0
+      favorite ? 1 : 0,
+      shareToCommunity ? 1 : 0,
+      brewingMethod || null
     );
 
     const newRecipe = {
@@ -292,7 +297,9 @@ router.post('/', ensureGuestUser, (req: any, res) => {
       water,
       temperature,
       brewTime,
-      favorite: Boolean(favorite)
+      favorite: Boolean(favorite),
+      shareToCommunity: Boolean(shareToCommunity),
+      brewingMethod
     };
 
     res.status(201).json(newRecipe);
@@ -306,12 +313,12 @@ router.post('/', ensureGuestUser, (req: any, res) => {
 router.put('/:id', ensureGuestUser, (req: any, res) => {
   try {
     const { id } = req.params;
-    const { name, ratio, dose, photo, process, processSteps, water, temperature, brewTime, favorite } = req.body;
+    const { name, ratio, dose, photo, process, processSteps, water, temperature, brewTime, favorite, shareToCommunity, brewingMethod } = req.body;
     
     const stmt = db.prepare(`
       UPDATE recipes 
       SET name = ?, ratio = ?, dose = ?, photo = ?, process = ?, process_steps = ?,
-          grind_size = ?, water = ?, yield = ?, temperature = ?, brew_time = ?, favorite = ?
+          grind_size = ?, water = ?, yield = ?, temperature = ?, brew_time = ?, favorite = ?, share_to_community = ?, brewing_method = ?
       WHERE id = ? AND guest_id = ?
     `);
     
@@ -328,6 +335,8 @@ router.put('/:id', ensureGuestUser, (req: any, res) => {
       temperature,
       brewTime,
       favorite ? 1 : 0,
+      shareToCommunity ? 1 : 0,
+      brewingMethod || null,
       id,
       req.guestId
     );

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Shield, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Shield, Loader2, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BuyMeCoffee } from "@/components/BuyMeCoffee";
 import {
@@ -29,6 +29,7 @@ export default function Admin() {
   const [adminKey, setAdminKey] = useState(searchParams.get('key') || '');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [templates, setTemplates] = useState<RecipeTemplate[]>([]);
+  const [sharedRecipes, setSharedRecipes] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -59,7 +60,26 @@ export default function Admin() {
       // Load templates
       const templatesData = await api.admin.getTemplates(key);
       console.log('Templates loaded:', templatesData.map(t => ({ name: t.name, photo: t.photo })));
-      setTemplates(templatesData);
+      
+      // Transform photo URLs for development
+      const transformedTemplates = templatesData.map(template => ({
+        ...template,
+        photo: template.photo && template.photo.startsWith('/') && import.meta.env.DEV
+          ? `${import.meta.env.VITE_API_URL || 'http://localhost:3005'}${template.photo}`
+          : template.photo
+      }));
+      setTemplates(transformedTemplates);
+      
+      // Load shared recipes
+      const sharedRecipesData = await api.admin.getSharedRecipes(key);
+      // Transform photo URLs for shared recipes too
+      const transformedSharedRecipes = sharedRecipesData.map(recipe => ({
+        ...recipe,
+        photo: recipe.photo && recipe.photo.startsWith('/') && import.meta.env.DEV
+          ? `${import.meta.env.VITE_API_URL || 'http://localhost:3005'}${recipe.photo}`
+          : recipe.photo
+      }));
+      setSharedRecipes(transformedSharedRecipes);
       
     } catch (error) {
       console.error('Authentication failed:', error);
@@ -115,9 +135,60 @@ export default function Admin() {
     try {
       const templatesData = await api.admin.getTemplates(adminKey);
       console.log('Templates reloaded:', templatesData.map(t => ({ name: t.name, photo: t.photo })));
-      setTemplates(templatesData);
+      
+      // Transform photo URLs for development
+      const transformedTemplates = templatesData.map(template => ({
+        ...template,
+        photo: template.photo && template.photo.startsWith('/') && import.meta.env.DEV
+          ? `${import.meta.env.VITE_API_URL || 'http://localhost:3005'}${template.photo}`
+          : template.photo
+      }));
+      setTemplates(transformedTemplates);
     } catch (error) {
       console.error('Failed to reload templates:', error);
+    }
+  };
+
+  const handleApproveSharedRecipe = async (id: string) => {
+    try {
+      await api.admin.approveSharedRecipe(adminKey, id);
+      setSharedRecipes(prev => prev.filter(r => r.id !== id));
+      toast({
+        title: "Recipe approved",
+        description: "Recipe has been added to community templates",
+      });
+      // Reload templates to show the new one
+      const templatesData = await api.admin.getTemplates(adminKey);
+      const transformedTemplates = templatesData.map(template => ({
+        ...template,
+        photo: template.photo && template.photo.startsWith('/') && import.meta.env.DEV
+          ? `${import.meta.env.VITE_API_URL || 'http://localhost:3005'}${template.photo}`
+          : template.photo
+      }));
+      setTemplates(transformedTemplates);
+    } catch (error) {
+      toast({
+        title: "Cannot approve",
+        description: "Failed to approve shared recipe",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRejectSharedRecipe = async (id: string) => {
+    try {
+      await api.admin.rejectSharedRecipe(adminKey, id);
+      setSharedRecipes(prev => prev.filter(r => r.id !== id));
+      toast({
+        title: "Recipe rejected",
+        description: "Recipe has been removed from shared list",
+      });
+    } catch (error) {
+      toast({
+        title: "Cannot reject",
+        description: "Failed to reject shared recipe",
+        variant: "destructive",
+      });
     }
   };
 
@@ -212,6 +283,84 @@ export default function Admin() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* Shared Recipes Pending Approval */}
+        {sharedRecipes.length > 0 && (
+          <Card className="border-yellow-500/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-yellow-500" />
+                Shared Recipes Pending Approval ({sharedRecipes.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {sharedRecipes.map((recipe) => (
+                  <Card key={recipe.id} className="hover:shadow-md transition-shadow bg-yellow-50 dark:bg-yellow-950/20">
+                    <CardContent className="p-4">
+                      <div className="flex gap-3">
+                        {recipe.photo ? (
+                          <img
+                            src={recipe.photo}
+                            alt={recipe.name}
+                            className="w-12 h-12 rounded-lg object-cover bg-muted flex-shrink-0"
+                            onError={(e) => {
+                              e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="48" height="48"%3E%3Crect fill="%23ddd" width="48" height="48"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999" font-size="10"%3ENo image%3C/text%3E%3C/svg%3E';
+                            }}
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                            <BookOpen className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h3 className="font-semibold text-lg">{recipe.name}</h3>
+                              <p className="text-xs text-muted-foreground">Shared by: {recipe.guestId}</p>
+                            </div>
+                            <div className="flex gap-1 flex-shrink-0">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                className="h-8"
+                                onClick={() => navigate('/brew-timer', { state: { recipe } })}
+                                title="Preview timer"
+                              >
+                                <Timer className="h-4 w-4 mr-1" />
+                                Preview
+                              </Button>
+                              <Button 
+                                variant="default" 
+                                size="sm"
+                                className="h-8"
+                                onClick={() => handleApproveSharedRecipe(recipe.id)}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8"
+                                onClick={() => handleRejectSharedRecipe(recipe.id)}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="space-y-1 mt-1">
+                            <p className="text-sm">{recipe.dose}g : {recipe.water}g ({recipe.ratio})</p>
+                            <p className="text-sm">{recipe.temperature}°C • {recipe.brewTime}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Recipe Templates */}

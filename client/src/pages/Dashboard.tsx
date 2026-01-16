@@ -4,6 +4,7 @@ import { useApp } from "@/contexts/AppContext";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Coffee, Star, Loader2, Timer, Pencil, Plus, Trash2, Mail, Shield } from "lucide-react";
 import { RecipeDialog } from "@/components/equipment/RecipeDialog";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -23,15 +24,25 @@ import { useToast } from "@/hooks/use-toast";
 import type { Recipe } from "@/contexts/AppContext";
 
 export default function Dashboard() {
-  const { recipes, isLoading, toggleRecipeFavorite, deleteRecipe } = useApp();
+  const { recipes, templates, isLoading, toggleRecipeFavorite, deleteRecipe, createFromTemplate } = useApp();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [copyingTemplateId, setCopyingTemplateId] = useState<string | null>(null);
+  const [brewingMethodFilter, setBrewingMethodFilter] = useState<string>("all");
 
   const favoriteRecipes = recipes.filter(r => r.favorite);
-  const otherRecipes = recipes.filter(r => !r.favorite);
+  const myRecipes = recipes; // Show all recipes including favorites
+  
+  // Filter community recipes by brewing method
+  const filteredCommunityRecipes = brewingMethodFilter === "all" 
+    ? templates 
+    : templates.filter(t => t.brewingMethod === brewingMethodFilter);
+  
+  // Get unique brewing methods from templates for filter
+  const brewingMethods = Array.from(new Set(templates.map(t => t.brewingMethod).filter(Boolean))).sort();
 
   const handleRecipeSelect = (recipe: any) => {
     navigate("/brew-timer", { state: { recipe } });
@@ -68,6 +79,25 @@ export default function Dashboard() {
         description: error instanceof Error ? error.message : "Failed to delete recipe",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleCopyFromTemplate = async (templateId: string) => {
+    setCopyingTemplateId(templateId);
+    try {
+      await createFromTemplate(templateId);
+      toast({
+        title: "Recipe added",
+        description: "Community recipe has been added to your recipes",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add recipe",
+        variant: "destructive",
+      });
+    } finally {
+      setCopyingTemplateId(null);
     }
   };
 
@@ -119,6 +149,7 @@ export default function Dashboard() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{recipe.name}</p>
                     <p className="text-xs text-muted-foreground">
+                      {recipe.brewingMethod && <>{recipe.brewingMethod} • </>}
                       {recipe.dose}g • {recipe.ratio} • {recipe.temperature}°C • {recipe.brewTime}
                     </p>
                     <div className="flex items-center gap-1 mt-2 flex-wrap">
@@ -179,7 +210,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">All Recipes</CardTitle>
+              <CardTitle className="text-lg">My Recipes</CardTitle>
               <Button 
                 variant="ghost" 
                 size="sm"
@@ -197,19 +228,15 @@ export default function Dashboard() {
                 <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
                 <p className="text-sm text-muted-foreground">Loading recipes...</p>
               </div>
-            ) : recipes.length === 0 ? (
-              <div className="text-center py-8">
-                <Coffee className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-4">
-                  No recipes available. Add some recipes to get started!
+            ) : myRecipes.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-muted-foreground">
+                  Add your own or copy from community recipes below!
                 </p>
-                <Button onClick={() => setDialogOpen(true)}>
-                  Add Recipe
-                </Button>
               </div>
             ) : (
               <div className="space-y-3">
-                {(favoriteRecipes.length > 0 ? otherRecipes : recipes).map((recipe) => (
+                {myRecipes.map((recipe) => (
                   <div
                     key={recipe.id}
                     className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
@@ -228,6 +255,7 @@ export default function Dashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{recipe.name}</p>
                       <p className="text-xs text-muted-foreground">
+                        {recipe.brewingMethod && <>{recipe.brewingMethod} • </>}
                         {recipe.dose}g • {recipe.ratio} • {recipe.temperature}°C • {recipe.brewTime}
                       </p>
                       <div className="flex items-center gap-1 mt-2 flex-wrap">
@@ -285,6 +313,107 @@ export default function Dashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Community Recipes Section */}
+        {templates.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Coffee className="h-5 w-5 text-primary" />
+                  Community Recipes
+                </CardTitle>
+                <Select value={brewingMethodFilter} onValueChange={setBrewingMethodFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="All Methods" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Methods</SelectItem>
+                    {brewingMethods.map((method) => (
+                      <SelectItem key={method} value={method!}>
+                        {method}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-3">
+              {filteredCommunityRecipes.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-muted-foreground">
+                    No recipes found for this brewing method
+                  </p>
+                </div>
+              ) : (
+                filteredCommunityRecipes.map((template) => (
+                <div
+                  key={template.id}
+                  className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 cursor-pointer hover:bg-muted transition-colors"
+                  onClick={() => handleRecipeSelect(template)}
+                >
+                  {template.photo && (
+                    <img 
+                      src={template.photo} 
+                      alt={template.name} 
+                      className="w-16 h-16 object-cover rounded-md"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{template.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {template.brewingMethod && <>{template.brewingMethod} • </>}
+                      {template.dose}g • {template.ratio} • {template.temperature}°C • {template.brewTime}
+                    </p>
+                    <div className="flex items-center gap-1 mt-2 flex-wrap">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopyFromTemplate(template.id);
+                        }}
+                        disabled={copyingTemplateId === template.id}
+                        title="Add to my recipes"
+                      >
+                        {copyingTemplateId === template.id ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin sm:mr-1" />
+                            <span className="text-xs hidden sm:inline">Adding...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Plus className="h-3.5 w-3.5 sm:mr-1" />
+                            <span className="text-xs hidden sm:inline">Add to My Recipes</span>
+                            <span className="text-xs sm:hidden">Add</span>
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRecipeSelect(template);
+                        }}
+                        title="Start timer"
+                      >
+                        <Timer className="h-3.5 w-3.5 sm:mr-1" />
+                        <span className="text-xs hidden sm:inline">Start</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Contact Us Link */}
         <div className="text-center pb-4 space-x-4">

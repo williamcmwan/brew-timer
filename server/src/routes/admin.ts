@@ -74,7 +74,7 @@ router.get('/templates', adminAuth, (req, res) => {
   try {
     const stmt = db.prepare(`
       SELECT id, name, ratio, dose, photo, process, process_steps, 
-             water, temperature, brew_time, created_at, updated_at
+             water, temperature, brew_time, brewing_method, created_at, updated_at
       FROM recipe_templates 
       ORDER BY name
     `);
@@ -90,6 +90,7 @@ router.get('/templates', adminAuth, (req, res) => {
         water: template.water,
         temperature: template.temperature,
         brewTime: template.brew_time, // Convert brew_time to brewTime
+        brewingMethod: template.brewing_method,
         processSteps: template.process_steps ? JSON.parse(template.process_steps) : undefined,
         created_at: template.created_at,
         updated_at: template.updated_at
@@ -108,14 +109,14 @@ router.post('/templates', adminAuth, (req, res) => {
   try {
     const { 
       name, ratio, dose, photo, process, processSteps, 
-      water, temperature, brewTime 
+      water, temperature, brewTime, brewingMethod
     } = req.body;
     
     const stmt = db.prepare(`
       INSERT INTO recipe_templates 
       (name, ratio, dose, photo, process, process_steps, grind_size, water, yield, 
-       temperature, brew_time, grinder_model, brewer_model, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+       temperature, brew_time, grinder_model, brewer_model, brewing_method, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `);
     
     const result = stmt.run(
@@ -131,7 +132,8 @@ router.post('/templates', adminAuth, (req, res) => {
       temperature,
       brewTime,
       null, // grinder_model - set to null
-      null  // brewer_model - set to null
+      null, // brewer_model - set to null
+      brewingMethod || null
     );
 
     const newTemplate = {
@@ -160,14 +162,14 @@ router.put('/templates/:id', adminAuth, (req, res) => {
     const { id } = req.params;
     const { 
       name, ratio, dose, photo, process, processSteps, 
-      water, temperature, brewTime 
+      water, temperature, brewTime, brewingMethod
     } = req.body;
     
     const stmt = db.prepare(`
       UPDATE recipe_templates 
       SET name = ?, ratio = ?, dose = ?, photo = ?, process = ?, process_steps = ?,
           grind_size = ?, water = ?, yield = ?, temperature = ?, brew_time = ?, 
-          grinder_model = ?, brewer_model = ?, updated_at = CURRENT_TIMESTAMP
+          grinder_model = ?, brewer_model = ?, brewing_method = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
     
@@ -185,6 +187,7 @@ router.put('/templates/:id', adminAuth, (req, res) => {
       brewTime,
       null, // grinder_model - set to null
       null, // brewer_model - set to null
+      brewingMethod || null,
       id
     );
 
@@ -241,6 +244,110 @@ router.get('/stats', adminAuth, (req, res) => {
   } catch (error) {
     console.error('Error fetching admin stats:', error);
     res.status(500).json({ error: 'Failed to fetch admin stats' });
+  }
+});
+
+// Get shared recipes pending approval
+router.get('/shared-recipes', adminAuth, (req, res) => {
+  try {
+    const stmt = db.prepare(`
+      SELECT r.id, r.guest_id, r.name, r.ratio, r.dose, r.photo, r.process, r.process_steps,
+             r.water, r.temperature, r.brew_time, r.brewing_method, r.created_at
+      FROM recipes r
+      WHERE r.share_to_community = 1
+      ORDER BY r.created_at DESC
+    `);
+    
+    const sharedRecipes = stmt.all().map((recipe: any) => ({
+      id: recipe.id.toString(),
+      guestId: recipe.guest_id,
+      name: recipe.name,
+      ratio: recipe.ratio,
+      dose: recipe.dose,
+      photo: recipe.photo,
+      process: recipe.process,
+      processSteps: recipe.process_steps ? JSON.parse(recipe.process_steps) : undefined,
+      water: recipe.water,
+      temperature: recipe.temperature,
+      brewTime: recipe.brew_time,
+      brewingMethod: recipe.brewing_method,
+      createdAt: recipe.created_at
+    }));
+
+    res.json(sharedRecipes);
+  } catch (error) {
+    console.error('Error fetching shared recipes:', error);
+    res.status(500).json({ error: 'Failed to fetch shared recipes' });
+  }
+});
+
+// Approve shared recipe and convert to template
+router.post('/shared-recipes/:id/approve', adminAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get the recipe
+    const recipe = db.prepare(`
+      SELECT * FROM recipes WHERE id = ? AND share_to_community = 1
+    `).get(id) as any;
+    
+    if (!recipe) {
+      return res.status(404).json({ error: 'Shared recipe not found' });
+    }
+    
+    // Create template from recipe
+    const insertStmt = db.prepare(`
+      INSERT INTO recipe_templates (name, ratio, dose, photo, process, process_steps,
+                                   water, temperature, brew_time, brewing_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    
+    const result = insertStmt.run(
+      recipe.name,
+      recipe.ratio,
+      recipe.dose,
+      recipe.photo,
+      recipe.process,
+      recipe.process_steps,
+      recipe.water,
+      recipe.temperature,
+      recipe.brew_time,
+      recipe.brewing_method
+    );
+    
+    // Unmark the recipe as shared (it's now approved)
+    db.prepare(`
+      UPDATE recipes SET share_to_community = 0 WHERE id = ?
+    `).run(id);
+    
+    res.json({
+      success: true,
+      templateId: result.lastInsertRowid.toString()
+    });
+  } catch (error) {
+    console.error('Error approving shared recipe:', error);
+    res.status(500).json({ error: 'Failed to approve shared recipe' });
+  }
+});
+
+// Reject shared recipe
+router.post('/shared-recipes/:id/reject', adminAuth, (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Unmark the recipe as shared
+    const result = db.prepare(`
+      UPDATE recipes SET share_to_community = 0 WHERE id = ? AND share_to_community = 1
+    `).run(id);
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Shared recipe not found' });
+    }
+    
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error rejecting shared recipe:', error);
+    res.status(500).json({ error: 'Failed to reject shared recipe' });
   }
 });
 

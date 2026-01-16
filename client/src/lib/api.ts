@@ -107,6 +107,17 @@ class ApiClient {
     getStats: (adminKey: string) => this.request('/api/admin/stats', {
       headers: { 'X-Admin-Key': adminKey },
     }),
+    getSharedRecipes: (adminKey: string) => this.request('/api/admin/shared-recipes', {
+      headers: { 'X-Admin-Key': adminKey },
+    }),
+    approveSharedRecipe: (adminKey: string, id: string) => this.request(`/api/admin/shared-recipes/${id}/approve`, {
+      method: 'POST',
+      headers: { 'X-Admin-Key': adminKey },
+    }),
+    rejectSharedRecipe: (adminKey: string, id: string) => this.request(`/api/admin/shared-recipes/${id}/reject`, {
+      method: 'POST',
+      headers: { 'X-Admin-Key': adminKey },
+    }),
   };
 }
 

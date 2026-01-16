@@ -21,6 +21,8 @@ export interface Recipe {
   brewTime: string;
   favorite?: boolean;
   templateId?: string;
+  shareToCommunity?: boolean;
+  brewingMethod?: string;
 }
 
 export interface RecipeTemplate {
@@ -34,6 +36,7 @@ export interface RecipeTemplate {
   water: number;
   temperature: number;
   brewTime: string;
+  brewingMethod?: string;
 }
 
 interface AppContextType {
@@ -107,6 +110,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [templates, setTemplates] = useState<RecipeTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Helper to transform photo URLs for templates
+  const transformPhotoUrl = (photo: string | undefined): string | undefined => {
+    if (!photo) return photo;
+    // In development, prefix with API base URL if it's a relative path
+    if (photo.startsWith('/') && import.meta.env.DEV) {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005';
+      const transformed = `${apiUrl}${photo}`;
+      console.log('Transforming photo URL:', photo, '->', transformed);
+      return transformed;
+    }
+    return photo;
+  };
+
   // Load recipes and templates from API with localStorage fallback
   useEffect(() => {
     const loadData = async () => {
@@ -117,12 +133,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           api.recipes.list()
         ]);
         
-        setTemplates(apiTemplates);
-        setRecipes(apiRecipes);
+        // Transform photo URLs for development
+        const transformedTemplates = apiTemplates.map(template => ({
+          ...template,
+          photo: transformPhotoUrl(template.photo)
+        }));
+        
+        const transformedRecipes = apiRecipes.map(recipe => ({
+          ...recipe,
+          photo: transformPhotoUrl(recipe.photo)
+        }));
+        
+        setTemplates(transformedTemplates);
+        setRecipes(transformedRecipes);
         
         // Save recipes to localStorage as backup (but not templates - they should always be fresh from server)
-        if (apiRecipes.length > 0) {
-          localStorage.setItem("coffee-timer-recipes", JSON.stringify(apiRecipes));
+        if (transformedRecipes.length > 0) {
+          localStorage.setItem("coffee-timer-recipes", JSON.stringify(transformedRecipes));
         }
       } catch (error) {
         console.warn("Failed to load data from API, falling back to localStorage:", error);
@@ -167,7 +194,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       // Try API first
       const createdRecipe = await api.recipes.create(newRecipe);
-      setRecipes(prev => [...prev, createdRecipe]);
+      // Transform photo URL for development
+      const transformedRecipe = {
+        ...createdRecipe,
+        photo: transformPhotoUrl(createdRecipe.photo)
+      };
+      setRecipes(prev => [...prev, transformedRecipe]);
     } catch (error) {
       console.warn("Failed to create recipe via API, using local storage:", error);
       // Fallback to local state
@@ -179,7 +211,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       // Try API first
       await api.recipes.update(id, recipe);
-      setRecipes(prev => prev.map(r => r.id === id ? { ...r, ...recipe } : r));
+      setRecipes(prev => prev.map(r => r.id === id ? { 
+        ...r, 
+        ...recipe,
+        photo: transformPhotoUrl(recipe.photo !== undefined ? recipe.photo : r.photo)
+      } : r));
     } catch (error) {
       console.warn("Failed to update recipe via API, using local storage:", error);
       // Fallback to local state
@@ -215,7 +251,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       // Try API first
       const createdRecipe = await api.recipes.createFromTemplate(templateId, name);
-      setRecipes(prev => [...prev, createdRecipe]);
+      // Transform photo URL for development
+      const transformedRecipe = {
+        ...createdRecipe,
+        photo: transformPhotoUrl(createdRecipe.photo)
+      };
+      setRecipes(prev => [...prev, transformedRecipe]);
     } catch (error) {
       console.warn("Failed to create recipe from template via API:", error);
       // Fallback: find template and create locally

@@ -378,7 +378,10 @@ export default function BrewTimerContent({
           )}
         </div>
         <div className="text-sm text-muted-foreground">
-          <p>Ratio: {recipe.ratio} · Dose: {recipe.dose}g · Water: {recipe.water}ml · {recipe.temperature}°C</p>
+          <p>
+            {recipe.brewingMethod && <>{recipe.brewingMethod} · </>}
+            Ratio: {recipe.ratio} · Dose: {recipe.dose}g · Water: {recipe.water}ml · {recipe.temperature}°C
+          </p>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

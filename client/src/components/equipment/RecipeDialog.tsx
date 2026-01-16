@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, X, Copy } from "lucide-react";
 import type { Recipe, RecipeStep, RecipeTemplate } from "@/contexts/AppContext";
@@ -23,6 +25,7 @@ const recipeSchema = z.object({
   temperature: z.number({ required_error: "Temperature is required", invalid_type_error: "Temperature must be a number" })
     .min(1, "Temperature must be at least 1°C").max(100),
   brewTime: z.string().trim().min(1, "Brew time is required").max(20),
+  brewingMethod: z.string().optional().or(z.literal("")),
 });
 
 type RecipeFormData = z.infer<typeof recipeSchema>;
@@ -63,6 +66,23 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
   // Track raw elapsed time input values to allow free editing
   const [elapsedTimeInputs, setElapsedTimeInputs] = useState<Record<number, string>>({});
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
+  const [shareToCommunity, setShareToCommunity] = useState(false);
+  const [brewingMethod, setBrewingMethod] = useState("");
+  const [customBrewingMethod, setCustomBrewingMethod] = useState("");
+
+  // Brewing method options (sorted alphabetically)
+  const brewingMethodOptions = [
+    "Aeropress",
+    "Chemex",
+    "Clever Dripper",
+    "French Press",
+    "Hario Switch",
+    "Kalita Wave",
+    "Orea",
+    "Origami",
+    "V60",
+    "Others"
+  ];
 
   // No need to fetch templates - they're already in context
 
@@ -108,7 +128,24 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
         water: recipe.water,
         temperature: recipe.temperature,
         brewTime: recipe.brewTime,
+        brewingMethod: recipe.brewingMethod || "",
       });
+      setShareToCommunity(recipe.shareToCommunity || false);
+      
+      // Handle brewing method
+      if (recipe.brewingMethod) {
+        if (brewingMethodOptions.includes(recipe.brewingMethod)) {
+          setBrewingMethod(recipe.brewingMethod);
+          setCustomBrewingMethod("");
+        } else {
+          setBrewingMethod("Others");
+          setCustomBrewingMethod(recipe.brewingMethod);
+        }
+      } else {
+        setBrewingMethod("");
+        setCustomBrewingMethod("");
+      }
+      
       if (recipe.processSteps && recipe.processSteps.length > 0) {
         setProcessSteps([...recipe.processSteps]);
         const inputs: Record<number, string> = {};
@@ -119,15 +156,22 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
       }
     } else {
       reset();
+      setShareToCommunity(false);
+      setBrewingMethod("");
+      setCustomBrewingMethod("");
       setProcessSteps([{ description: "", waterAmount: 0, duration: 30 }]);
       setElapsedTimeInputs({ 0: "30" });
     }
   }, [recipe, isCloning, reset]);
 
   const onSubmit = async (data: RecipeFormData) => {
+    const finalBrewingMethod = brewingMethod === "Others" ? customBrewingMethod : brewingMethod;
+    
     const recipeData = {
       ...data,
-      processSteps: processSteps.filter(step => step.description.trim() !== "")
+      processSteps: processSteps.filter(step => step.description.trim() !== ""),
+      shareToCommunity,
+      brewingMethod: finalBrewingMethod || undefined
     };
 
     try {
@@ -232,7 +276,7 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
                 onClick={() => setShowTemplatePicker(!showTemplatePicker)}
               >
                 <Copy className="h-4 w-4 mr-2" />
-                Add from templates
+                Add from Community Recipes
               </Button>
               {showTemplatePicker && (
                 <div className="border rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto bg-muted/50">
@@ -272,6 +316,30 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
             <Label htmlFor="name">Name *</Label>
             <Input id="name" {...register("name")} placeholder="e.g., Morning V60" />
             {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="brewingMethod">Brewing Method</Label>
+            <Select value={brewingMethod} onValueChange={setBrewingMethod}>
+              <SelectTrigger id="brewingMethod">
+                <SelectValue placeholder="Select brewing method" />
+              </SelectTrigger>
+              <SelectContent>
+                {brewingMethodOptions.map((method) => (
+                  <SelectItem key={method} value={method}>
+                    {method}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {brewingMethod === "Others" && (
+              <Input
+                placeholder="Enter custom brewing method"
+                value={customBrewingMethod}
+                onChange={(e) => setCustomBrewingMethod(e.target.value)}
+                className="mt-2"
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -438,6 +506,20 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
             <Label htmlFor="brewTime">Brew Time *</Label>
             <Input id="brewTime" {...register("brewTime")} placeholder="3:00" />
             {errors.brewTime && <p className="text-sm text-destructive">{errors.brewTime.message}</p>}
+          </div>
+
+          <div className="flex items-center space-x-2 pt-2">
+            <Checkbox 
+              id="shareToCommunity" 
+              checked={shareToCommunity}
+              onCheckedChange={(checked) => setShareToCommunity(checked as boolean)}
+            />
+            <Label 
+              htmlFor="shareToCommunity" 
+              className="text-sm font-normal cursor-pointer"
+            >
+              Share in community recipes (subject to approval)
+            </Label>
           </div>
 
           <div className="flex gap-2 pt-4">
