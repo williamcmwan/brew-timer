@@ -69,6 +69,7 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
   const [shareToCommunity, setShareToCommunity] = useState(false);
   const [brewingMethod, setBrewingMethod] = useState("");
   const [customBrewingMethod, setCustomBrewingMethod] = useState("");
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // Brewing method options (sorted alphabetically)
   const brewingMethodOptions = [
@@ -90,6 +91,8 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<RecipeFormData>({
     resolver: zodResolver(recipeSchema),
@@ -104,6 +107,69 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
       brewTime: "3:00",
     },
   });
+
+  const photo = watch("photo");
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file",
+        description: "Please select an image file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+
+      const apiUrl = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:3005');
+      const guestId = localStorage.getItem('coffee-timer-guest-id');
+      
+      const response = await fetch(`${apiUrl}/api/recipes/upload-photo`, {
+        method: 'POST',
+        headers: {
+          'X-Guest-ID': guestId || '',
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+
+      const data = await response.json();
+      setValue('photo', data.path);
+      toast({
+        title: "Photo uploaded",
+        description: "Photo has been uploaded successfully"
+      });
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to upload photo",
+        variant: "destructive"
+      });
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   // Scroll to first validation error
   const onFormError = (formErrors: typeof errors) => {
@@ -312,12 +378,15 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
               )}
             </div>
           )}
+          
+          {/* 1. Name */}
           <div className="space-y-2">
             <Label htmlFor="name">Name *</Label>
             <Input id="name" {...register("name")} placeholder="e.g., Morning V60" />
             {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
           </div>
 
+          {/* 2. Brewing Method */}
           <div className="space-y-2">
             <Label htmlFor="brewingMethod">Brewing Method</Label>
             <Select value={brewingMethod} onValueChange={setBrewingMethod}>
@@ -342,6 +411,27 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
             )}
           </div>
 
+          {/* 3. Temperature & Brew Time */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="temperature">Temp (°C) *</Label>
+              <Input
+                id="temperature"
+                type="number"
+                step="any"
+                {...register("temperature", { valueAsNumber: true })}
+              />
+              {errors.temperature && <p className="text-sm text-destructive">{errors.temperature.message}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="brewTime">Brew Time *</Label>
+              <Input id="brewTime" {...register("brewTime")} placeholder="3:00" />
+              {errors.brewTime && <p className="text-sm text-destructive">{errors.brewTime.message}</p>}
+            </div>
+          </div>
+
+          {/* 4. Ratio & Dose */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ratio">Ratio *</Label>
@@ -361,6 +451,47 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
             </div>
           </div>
 
+          {/* 5. Water */}
+          <div className="space-y-2">
+            <Label htmlFor="water">Water (g) *</Label>
+            <Input
+              id="water"
+              type="number"
+              step="any"
+              {...register("water", { valueAsNumber: true })}
+            />
+            {errors.water && <p className="text-sm text-destructive">{errors.water.message}</p>}
+          </div>
+
+          {/* 6. Photo */}
+          <div className="space-y-2">
+            <Label htmlFor="photoUpload">Photo</Label>
+            <div className="flex gap-2">
+              <Input
+                id="photoUpload"
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                disabled={uploadingPhoto}
+                className="flex-1"
+              />
+              {uploadingPhoto && <span className="text-sm text-muted-foreground">Uploading...</span>}
+            </div>
+            {photo && (
+              <div className="mt-2">
+                <img 
+                  src={photo} 
+                  alt="Recipe preview" 
+                  className="w-full h-32 object-cover rounded-lg border"
+                  onError={(e) => {
+                    e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3ENo image%3C/text%3E%3C/svg%3E';
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* 7. Process Steps */}
           <div className="space-y-2">
             <Label>Process Steps *</Label>
             <div className="space-y-3">
@@ -478,36 +609,7 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="water">Water (g) *</Label>
-              <Input
-                id="water"
-                type="number"
-                step="any"
-                {...register("water", { valueAsNumber: true })}
-              />
-              {errors.water && <p className="text-sm text-destructive">{errors.water.message}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="temperature">Temp (°C) *</Label>
-              <Input
-                id="temperature"
-                type="number"
-                step="any"
-                {...register("temperature", { valueAsNumber: true })}
-              />
-              {errors.temperature && <p className="text-sm text-destructive">{errors.temperature.message}</p>}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="brewTime">Brew Time *</Label>
-            <Input id="brewTime" {...register("brewTime")} placeholder="3:00" />
-            {errors.brewTime && <p className="text-sm text-destructive">{errors.brewTime.message}</p>}
-          </div>
-
+          {/* Share to Community */}
           <div className="flex items-center space-x-2 pt-2">
             <Checkbox 
               id="shareToCommunity" 
