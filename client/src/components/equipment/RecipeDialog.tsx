@@ -248,7 +248,7 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
                       <div className="flex items-center gap-2 w-full">
                         {template.photo ? (
                           <img 
-                            src={template.photo.startsWith('/') ? `http://localhost:3003${template.photo}` : template.photo} 
+                            src={template.photo} 
                             alt={template.name} 
                             className="w-8 h-8 rounded object-cover shrink-0"
                             onError={(e) => {

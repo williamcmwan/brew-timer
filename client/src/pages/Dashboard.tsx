@@ -108,7 +108,7 @@ export default function Dashboard() {
                 >
                   {recipe.photo && (
                     <img 
-                      src={recipe.photo.startsWith('/') ? `http://localhost:3003${recipe.photo}` : recipe.photo} 
+                      src={recipe.photo} 
                       alt={recipe.name} 
                       className="w-16 h-16 object-cover rounded-md"
                       onError={(e) => {
@@ -217,7 +217,7 @@ export default function Dashboard() {
                   >
                     {recipe.photo && (
                       <img 
-                        src={recipe.photo.startsWith('/') ? `http://localhost:3003${recipe.photo}` : recipe.photo} 
+                        src={recipe.photo} 
                         alt={recipe.name} 
                         className="w-16 h-16 object-cover rounded-md"
                         onError={(e) => {

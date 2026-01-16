@@ -128,7 +128,7 @@ export default function Recipes() {
                   <div className="flex gap-3">
                     {recipe.photo ? (
                       <img
-                        src={recipe.photo.startsWith('/') ? `http://localhost:3003${recipe.photo}` : recipe.photo}
+                        src={recipe.photo}
                         alt={recipe.name}
                         className="w-12 h-12 rounded-lg object-cover bg-muted flex-shrink-0"
                         onError={(e) => {

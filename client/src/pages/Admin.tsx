@@ -245,7 +245,7 @@ export default function Admin() {
                       <div className="flex gap-3">
                         {template.photo ? (
                           <img
-                            src={template.photo.startsWith('/') ? `http://localhost:3003${template.photo}` : template.photo}
+                            src={template.photo}
                             alt={template.name}
                             className="w-12 h-12 rounded-lg object-cover bg-muted flex-shrink-0"
                             onError={(e) => {

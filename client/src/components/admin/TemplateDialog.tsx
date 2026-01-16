@@ -135,7 +135,8 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
       const formData = new FormData();
       formData.append('photo', file);
 
-      const response = await fetch('http://localhost:3003/api/admin/upload-photo', {
+      const apiUrl = import.meta.env.PROD ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:3005');
+      const response = await fetch(`${apiUrl}/api/admin/upload-photo`, {
         method: 'POST',
         headers: {
           'X-Admin-Key': adminKey,
@@ -349,7 +350,7 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
             {photo && (
               <div className="mt-2">
                 <img 
-                  src={photo.startsWith('/') ? `http://localhost:3003${photo}` : photo} 
+                  src={photo} 
                   alt="Recipe preview" 
                   className="w-full h-32 object-cover rounded-lg border"
                   onError={(e) => {
