@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Play, Pause, RotateCcw, Coffee, X, Check, ArrowLeft } from "lucide-react";
-import { BuyMeCoffee } from "@/components/BuyMeCoffee";
 
 interface TimerStep {
   title: string;
@@ -367,7 +366,16 @@ export default function BrewTimerContent({
             <Coffee className="h-5 w-5" />
             {recipe.name}
           </CardTitle>
-          <BuyMeCoffee />
+          {showCloseButton && onClose && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={onClose}
+              title="Close"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
         </div>
         <div className="text-sm text-muted-foreground">
           <p>Ratio: {recipe.ratio} · Dose: {recipe.dose}g · Water: {recipe.water}ml · {recipe.temperature}°C</p>
