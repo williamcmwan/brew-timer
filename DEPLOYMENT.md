@@ -133,6 +133,14 @@ server {
 
 ### Troubleshooting
 
+**"Cannot GET /" error:**
+- This means the server isn't serving the React app
+- Make sure you ran `./scripts/deploy.sh` to build both client and server
+- Check server logs: `./scripts/app.sh logs`
+- Look for "📦 Serving client app from:" message in logs
+- If missing, rebuild: `npm run build --prefix client && npm run build --prefix server`
+- Then restart: `./scripts/app.sh restart`
+
 **Images not showing:**
 - Check `server/data/template-images/` exists and has images
 - Check server logs: `./scripts/app.sh logs`

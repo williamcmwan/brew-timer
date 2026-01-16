@@ -88,18 +88,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve static files from client dist in production
-if (process.env.NODE_ENV === 'production') {
-  const clientDistPath = path.join(__dirname, '../../client/dist');
-  if (fs.existsSync(clientDistPath)) {
-    app.use(express.static(clientDistPath));
-    
-    // Handle client-side routing
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(clientDistPath, 'index.html'));
-    });
-  }
-}
+// 404 handler for API routes (must be before static files)
+app.use('/api/*', (req, res) => {
+  res.status(404).json({ error: 'API endpoint not found' });
+});
 
 // Error handling middleware
 app.use((err: any, req: any, res: any, next: any) => {
@@ -110,10 +102,20 @@ app.use((err: any, req: any, res: any, next: any) => {
   });
 });
 
-// 404 handler for API routes
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ error: 'API endpoint not found' });
-});
+// Serve static files from client dist (must be after API routes)
+const clientDistPath = path.join(__dirname, '../../client/dist');
+if (fs.existsSync(clientDistPath)) {
+  console.log('📦 Serving client app from:', clientDistPath);
+  app.use(express.static(clientDistPath));
+  
+  // Handle client-side routing - must be last
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+} else {
+  console.log('⚠️  Client dist not found at:', clientDistPath);
+  console.log('   Run build script to create production build');
+}
 
 app.listen(PORT, () => {
   console.log(`🚀 Coffee Timer API server running on port ${PORT}`);
