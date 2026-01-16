@@ -7,7 +7,11 @@ client/dist/
 server/dist/
 
 # Database
-server/data/
+server/data/*.db
+server/data/*.db-*
+
+# User uploaded images (exclude from git)
+server/data/recipe-images/
 
 # Logs
 *.log

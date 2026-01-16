@@ -1,0 +1,3 @@
+# Template Images Directory
+# This directory contains recipe template images that should be included in version control
+# These images are served at /template-images/[filename]
