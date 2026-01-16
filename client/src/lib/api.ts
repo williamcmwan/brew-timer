@@ -1,4 +1,8 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3005';
+// In production, use relative URLs since server serves both API and static files
+// In development, use VITE_API_URL or default to localhost:3005
+const API_BASE_URL = import.meta.env.PROD 
+  ? '' // Empty string for relative URLs in production
+  : (import.meta.env.VITE_API_URL || 'http://localhost:3005');
 
 // Simple API client for guest mode
 class ApiClient {
