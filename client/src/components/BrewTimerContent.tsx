@@ -498,9 +498,10 @@ export default function BrewTimerContent({
                         {(isRunning || (currentStepIndex > 0 || totalElapsedTime > 0)) && (
                           <div className="absolute top-12 left-1/2 transform -translate-x-1/2 flex gap-2">
                             {isLastStep && isRunning && currentStep.waterAmount && currentStep.waterAmount > 0 ? (
-                              /* Last step with flow/water - show small tick button */
-                              <Button onClick={handleFinish} size="sm" variant="ghost" className="h-9 px-4 text-muted-foreground hover:text-foreground">
-                                <Check className="h-4 w-4" />
+                              /* Last step with flow/water - show Complete button */
+                              <Button onClick={handleFinish} size="sm" className="h-9 px-6">
+                                <Check className="h-4 w-4 mr-2" />
+                                Complete
                               </Button>
                             ) : !isLastStep || !isRunning ? (
                               /* Other steps - show pause/reset */
