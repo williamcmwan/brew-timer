@@ -514,14 +514,22 @@ export default function BrewTimerContent({
                         
                         {/* Main countdown timer - always centered */}
                         <div className="flex flex-col items-center justify-center gap-4">
+                          {/* Complete button during last step - above timer if flow/water showing */}
+                          {isLastStep && isRunning && currentStep.waterAmount && currentStep.waterAmount > 0 && (
+                            <Button onClick={handleFinish} size="lg" className="h-12 px-8">
+                              <Check className="h-5 w-5 mr-2" />
+                              Complete
+                            </Button>
+                          )}
+                          
                           <div className={`font-bold tabular-nums text-center ${
                             overtimeSeconds > 0 ? 'text-blue-500' : timeRemaining <= 5 && timeRemaining > 0 ? 'text-orange-500' : ''
                           }`} style={{ fontSize: '6rem', lineHeight: 1 }}>
                             {overtimeSeconds > 0 ? `+${formatTime(overtimeSeconds)}` : formatTime(timeRemaining)}
                           </div>
                           
-                          {/* Complete button during last step - below timer */}
-                          {isLastStep && isRunning && (
+                          {/* Complete button during last step - below timer if no flow/water */}
+                          {isLastStep && isRunning && (!currentStep.waterAmount || currentStep.waterAmount === 0) && (
                             <Button onClick={handleFinish} size="lg" className="h-12 px-8">
                               <Check className="h-5 w-5 mr-2" />
                               Complete
