@@ -474,7 +474,7 @@ export default function BrewTimerContent({
                   </svg>
                   
                   {/* Content inside circle */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center py-6">
+                  <div className="absolute inset-0 flex items-center justify-center py-6" style={{ marginTop: '-20px' }}>
                     {/* Show Start button in center when not started */}
                     {!isRunning && currentStepIndex === 0 && totalElapsedTime === 0 && !isComplete ? (
                       <Button onClick={handleStart} size="lg" className="h-20 w-40 text-xl">
@@ -492,88 +492,78 @@ export default function BrewTimerContent({
                         </div>
                       </div>
                     ) : (
-                      /* Running state - show countdown timer */
-                      <div className="flex flex-col items-center justify-between h-full py-4">
-                        {/* Control buttons - positioned lower */}
-                        {(isRunning || (currentStepIndex > 0 || totalElapsedTime > 0)) && (
-                          <div className="flex gap-2 pt-6">
-                            {isLastStep && isRunning ? (
-                              <>
-                                <Button onClick={handleFinish} size="sm" className="h-9 px-4">
-                                  <Check className="h-4 w-4" />
-                                </Button>
-                                <Button onClick={handleReset} size="sm" variant="ghost" className="h-9 px-4 text-muted-foreground hover:text-foreground">
-                                  <RotateCcw className="h-4 w-4" />
-                                </Button>
-                              </>
+                      /* Running state - timer always centered, other elements positioned absolutely */
+                      <>
+                        {/* Control buttons - absolutely positioned at top (hide during last step) */}
+                        {(isRunning || (currentStepIndex > 0 || totalElapsedTime > 0)) && !isLastStep && (
+                          <div className="absolute top-12 left-1/2 transform -translate-x-1/2 flex gap-2">
+                            {!isRunning ? (
+                              <Button onClick={handleStart} size="sm" className="h-9 px-4">
+                                <Play className="h-4 w-4" />
+                              </Button>
                             ) : (
-                              <>
-                                {!isRunning ? (
-                                  <Button onClick={handleStart} size="sm" className="h-9 px-4">
-                                    <Play className="h-4 w-4" />
-                                  </Button>
-                                ) : (
-                                  <Button onClick={handlePause} size="sm" variant="ghost" className="h-9 px-4 text-muted-foreground hover:text-foreground">
-                                    <Pause className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                <Button onClick={handleReset} size="sm" variant="ghost" className="h-9 px-4 text-muted-foreground hover:text-foreground">
-                                  <RotateCcw className="h-4 w-4" />
-                                </Button>
-                              </>
+                              <Button onClick={handlePause} size="sm" variant="ghost" className="h-9 px-4 text-muted-foreground hover:text-foreground">
+                                <Pause className="h-4 w-4" />
+                              </Button>
                             )}
+                            <Button onClick={handleReset} size="sm" variant="ghost" className="h-9 px-4 text-muted-foreground hover:text-foreground">
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
                           </div>
                         )}
                         
-                        {/* Main countdown timer - centered */}
-                        <div className="flex items-center justify-center">
+                        {/* Main countdown timer - always centered */}
+                        <div className="flex flex-col items-center justify-center gap-4">
                           <div className={`font-bold tabular-nums text-center ${
                             overtimeSeconds > 0 ? 'text-blue-500' : timeRemaining <= 5 && timeRemaining > 0 ? 'text-orange-500' : ''
                           }`} style={{ fontSize: '6rem', lineHeight: 1 }}>
                             {overtimeSeconds > 0 ? `+${formatTime(overtimeSeconds)}` : formatTime(timeRemaining)}
                           </div>
-                        </div>
-                        
-                        {/* Flow rate and total water - positioned higher, or spacer if no water */}
-                        <div className="pb-6">
-                          {currentStep.waterAmount && currentStep.waterAmount > 0 ? (
-                            <div className="flex gap-6 text-muted-foreground">
-                              <div className="flex flex-col items-center">
-                                <span className="text-sm uppercase tracking-wide">Flow</span>
-                                <span className="text-3xl font-bold text-foreground">
-                                  {(currentStep.flowRate ?? (currentStep.waterAmount / currentStep.duration)).toFixed(1)}<span className="text-xl">g/s</span>
-                                </span>
-                              </div>
-                              <div className="flex flex-col items-center">
-                                <span className="text-sm uppercase tracking-wide">Water</span>
-                                <span className="text-3xl font-bold text-foreground">
-                                  {(() => {
-                                    // Calculate cumulative water up to previous steps
-                                    const previousWater = steps.slice(0, currentStepIndex).reduce((sum, s) => 
-                                      sum + (s.waterAmount || 0), 0
-                                    );
-                                    // Calculate current step progress using custom or calculated flow rate
-                                    const stepElapsed = currentStep.duration - timeRemaining;
-                                    const flowRate = currentStep.flowRate ?? (currentStep.waterAmount / currentStep.duration);
-                                    const currentStepWater = Math.min(stepElapsed * flowRate, currentStep.waterAmount);
-                                    return Math.round(previousWater + currentStepWater);
-                                  })()}
-                                  <span className="text-xl text-muted-foreground">/{(() => {
-                                    // Calculate target water at end of this step
-                                    const targetWater = steps.slice(0, currentStepIndex + 1).reduce((sum, s) => 
-                                      sum + (s.waterAmount || 0), 0
-                                    );
-                                    return targetWater;
-                                  })()}g</span>
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            /* Empty spacer to maintain layout when no water info */
-                            <div className="h-16"></div>
+                          
+                          {/* Complete button during last step - below timer */}
+                          {isLastStep && isRunning && (
+                            <Button onClick={handleFinish} size="lg" className="h-12 px-8">
+                              <Check className="h-5 w-5 mr-2" />
+                              Complete
+                            </Button>
                           )}
                         </div>
-                      </div>
+                        
+                        {/* Flow rate and total water - absolutely positioned at bottom */}
+                        {currentStep.waterAmount && currentStep.waterAmount > 0 && (
+                          <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex gap-6 text-muted-foreground">
+                            <div className="flex flex-col items-center">
+                              <span className="text-sm uppercase tracking-wide">Flow</span>
+                              <span className="text-3xl font-bold text-foreground">
+                                {(currentStep.flowRate ?? (currentStep.waterAmount / currentStep.duration)).toFixed(1)}<span className="text-xl">g/s</span>
+                              </span>
+                            </div>
+                            <div className="flex flex-col items-center">
+                              <span className="text-sm uppercase tracking-wide">Water</span>
+                              <span className="text-3xl font-bold text-foreground">
+                                {(() => {
+                                  // Calculate cumulative water up to previous steps
+                                  const previousWater = steps.slice(0, currentStepIndex).reduce((sum, s) => 
+                                    sum + (s.waterAmount || 0), 0
+                                  );
+                                  // Calculate current step progress using custom or calculated flow rate
+                                  const stepElapsed = currentStep.duration - timeRemaining;
+                                  const flowRate = currentStep.flowRate ?? (currentStep.waterAmount / currentStep.duration);
+                                  const currentStepWater = Math.min(stepElapsed * flowRate, currentStep.waterAmount);
+                                  return Math.round(previousWater + currentStepWater);
+                                })()}
+                                <span className="text-xl text-muted-foreground">/{(() => {
+                                  // Calculate target water at end of this step
+                                  const targetWater = steps.slice(0, currentStepIndex + 1).reduce((sum, s) => 
+                                    sum + (s.waterAmount || 0), 0
+                                  );
+                                  return targetWater;
+                                })()}g</span>
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
