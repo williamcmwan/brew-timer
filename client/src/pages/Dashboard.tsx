@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { api } from "@/lib/api";
@@ -31,7 +31,16 @@ export default function Dashboard() {
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [copyingTemplateId, setCopyingTemplateId] = useState<string | null>(null);
-  const [brewingMethodFilter, setBrewingMethodFilter] = useState<string>("all");
+  
+  // Load brewing method filter from localStorage
+  const [brewingMethodFilter, setBrewingMethodFilter] = useState<string>(() => {
+    return localStorage.getItem('brewingMethodFilter') || 'all';
+  });
+
+  // Save brewing method filter to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('brewingMethodFilter', brewingMethodFilter);
+  }, [brewingMethodFilter]);
 
   const favoriteRecipes = recipes.filter(r => r.favorite);
   const myRecipes = recipes; // Show all recipes including favorites
