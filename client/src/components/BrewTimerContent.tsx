@@ -494,41 +494,43 @@ export default function BrewTimerContent({
                     ) : (
                       /* Running state - timer always centered, other elements positioned absolutely */
                       <>
-                        {/* Control buttons - absolutely positioned at top (hide during last step) */}
-                        {(isRunning || (currentStepIndex > 0 || totalElapsedTime > 0)) && !isLastStep && (
+                        {/* Control buttons - absolutely positioned at top */}
+                        {(isRunning || (currentStepIndex > 0 || totalElapsedTime > 0)) && (
                           <div className="absolute top-12 left-1/2 transform -translate-x-1/2 flex gap-2">
-                            {!isRunning ? (
-                              <Button onClick={handleStart} size="sm" className="h-9 px-4">
-                                <Play className="h-4 w-4" />
+                            {isLastStep && isRunning ? (
+                              /* Last step - show only Complete button */
+                              <Button onClick={handleFinish} size="sm" className="h-9 px-4">
+                                <Check className="h-4 w-4" />
                               </Button>
                             ) : (
-                              <Button onClick={handlePause} size="sm" variant="ghost" className="h-9 px-4 text-muted-foreground hover:text-foreground">
-                                <Pause className="h-4 w-4" />
-                              </Button>
+                              /* Other steps - show pause/reset */
+                              <>
+                                {!isRunning ? (
+                                  <Button onClick={handleStart} size="sm" className="h-9 px-4">
+                                    <Play className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <Button onClick={handlePause} size="sm" variant="ghost" className="h-9 px-4 text-muted-foreground hover:text-foreground">
+                                    <Pause className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button onClick={handleReset} size="sm" variant="ghost" className="h-9 px-4 text-muted-foreground hover:text-foreground">
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                              </>
                             )}
-                            <Button onClick={handleReset} size="sm" variant="ghost" className="h-9 px-4 text-muted-foreground hover:text-foreground">
-                              <RotateCcw className="h-4 w-4" />
-                            </Button>
                           </div>
                         )}
                         
                         {/* Main countdown timer - always centered */}
                         <div className="flex flex-col items-center justify-center gap-4">
-                          {/* Complete button during last step - above timer if flow/water showing */}
-                          {isLastStep && isRunning && currentStep.waterAmount && currentStep.waterAmount > 0 && (
-                            <Button onClick={handleFinish} size="lg" className="h-12 px-8">
-                              <Check className="h-5 w-5 mr-2" />
-                              Complete
-                            </Button>
-                          )}
-                          
                           <div className={`font-bold tabular-nums text-center ${
                             overtimeSeconds > 0 ? 'text-blue-500' : timeRemaining <= 5 && timeRemaining > 0 ? 'text-orange-500' : ''
                           }`} style={{ fontSize: '6rem', lineHeight: 1 }}>
                             {overtimeSeconds > 0 ? `+${formatTime(overtimeSeconds)}` : formatTime(timeRemaining)}
                           </div>
                           
-                          {/* Complete button during last step - below timer if no flow/water */}
+                          {/* Complete button during last step - below timer only if no flow/water */}
                           {isLastStep && isRunning && (!currentStep.waterAmount || currentStep.waterAmount === 0) && (
                             <Button onClick={handleFinish} size="lg" className="h-12 px-8">
                               <Check className="h-5 w-5 mr-2" />
