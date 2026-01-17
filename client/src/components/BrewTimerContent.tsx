@@ -530,8 +530,8 @@ export default function BrewTimerContent({
                             {overtimeSeconds > 0 ? `+${formatTime(overtimeSeconds)}` : formatTime(timeRemaining)}
                           </div>
                           
-                          {/* Complete button during last step - below timer only if no flow/water */}
-                          {isLastStep && isRunning && (!currentStep.waterAmount || currentStep.waterAmount === 0) && (
+                          {/* Complete button during last step - below timer when time is up */}
+                          {isLastStep && isRunning && timeRemaining === 0 && (
                             <Button onClick={handleFinish} size="lg" className="h-12 px-8">
                               <Check className="h-5 w-5 mr-2" />
                               Complete
