@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useApp } from "@/contexts/AppContext";
+import { api } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -22,16 +23,16 @@ interface BrewTimerContentProps {
   onBack?: () => void;
 }
 
-export default function BrewTimerContent({ 
-  recipe, 
-  onClose, 
+export default function BrewTimerContent({
+  recipe,
+  onClose,
   onComplete,
   completeButtonText = "Log Brew",
   showCloseButton = true,
   showBorder = false,
   onBack
 }: BrewTimerContentProps) {
-  
+
   const [steps, setSteps] = useState<TimerStep[]>([]);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(0);
@@ -40,10 +41,13 @@ export default function BrewTimerContent({
   const [isLastStep, setIsLastStep] = useState(false);
   const [overtimeSeconds, setOvertimeSeconds] = useState(0);
   const [totalElapsedTime, setTotalElapsedTime] = useState(0);
-  
+
   // Persistent AudioContext for mobile browser support
   const audioContextRef = useRef<AudioContext | null>(null);
-  
+
+  // Track if we've recorded this brew session
+  const sessionRecordedRef = useRef(false);
+
   // Initialize and unlock AudioContext on user interaction
   const getAudioContext = useCallback(() => {
     if (!audioContextRef.current) {
@@ -59,9 +63,9 @@ export default function BrewTimerContent({
   // Parse recipe process into timed steps
   useEffect(() => {
     if (!recipe) return;
-    
+
     const parsedSteps: TimerStep[] = [];
-    
+
     // Helper to parse brew time (mm:ss or seconds)
     const parseBrewTime = (time: string): number => {
       if (time.includes(':')) {
@@ -70,7 +74,7 @@ export default function BrewTimerContent({
       }
       return Number(time) || 180;
     };
-    
+
     // Add initial preparation step (0 seconds - starts immediately)
     const grindSizeText = recipe.grindSize ? ` ground at setting ${recipe.grindSize}` : '';
     parsedSteps.push({
@@ -78,7 +82,7 @@ export default function BrewTimerContent({
       duration: 0,
       description: `Heat water to ${recipe.temperature}°C. Prepare ${recipe.dose}g of coffee${grindSizeText}.`
     });
-    
+
     // Use structured process steps if available (elapsed times)
     if (recipe.processSteps && recipe.processSteps.length > 0) {
       let previousElapsed = 0;
@@ -95,7 +99,7 @@ export default function BrewTimerContent({
         });
         previousElapsed = step.duration;
       });
-      
+
       // Add drawdown step using brew time
       const brewTimeSeconds = parseBrewTime(recipe.brewTime);
       const drawdownDuration = brewTimeSeconds - previousElapsed;
@@ -110,7 +114,7 @@ export default function BrewTimerContent({
       // Fallback to old process parsing or default steps
       const brewTimeSeconds = parseBrewTime(recipe.brewTime);
       const water = Number(recipe.water) || 0;
-      
+
       if (recipe.process) {
         const lines = recipe.process.split('\n').filter(line => line.trim());
         lines.forEach((line, index) => {
@@ -140,14 +144,14 @@ export default function BrewTimerContent({
         });
       }
     }
-    
+
     // Add final step
     parsedSteps.push({
       title: "Complete",
       duration: 0,
       description: "Brewing complete! Enjoy your coffee."
     });
-    
+
     setSteps(parsedSteps);
     setTimeRemaining(parsedSteps[0]?.duration || 0);
   }, [recipe]);
@@ -158,16 +162,16 @@ export default function BrewTimerContent({
       const audioContext = getAudioContext();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      
+
       oscillator.frequency.value = 1200;
       oscillator.type = 'square';
-      
+
       gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.08);
-      
+
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.08);
     } catch (e) {
@@ -181,16 +185,16 @@ export default function BrewTimerContent({
       const audioContext = getAudioContext();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-      
+
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
-      
+
       oscillator.frequency.value = 880;
       oscillator.type = 'sine';
-      
+
       gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.8);
-      
+
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.8);
     } catch (e) {
@@ -216,47 +220,47 @@ export default function BrewTimerContent({
   // Timer countdown logic
   useEffect(() => {
     if (!isRunning) return;
-    
+
     const interval = setInterval(() => {
       // Always increment total elapsed time when running
       setTotalElapsedTime(prev => prev + 1);
-      
+
       // Handle overtime mode (last step, countdown finished)
       if (isLastStep && timeRemaining <= 0) {
         setOvertimeSeconds(prev => prev + 1);
         return;
       }
-      
+
       if (timeRemaining <= 0) return;
-      
+
       setTimeRemaining(prev => {
         // Play tick sound in last 5 seconds (but not at 0)
         if (prev <= 6 && prev > 1) {
           playTickSound();
         }
-        
+
         if (prev <= 1) {
           // Step completed - play bell
           playBellSound();
-          
+
           if (currentStepIndex < steps.length - 1) {
             // Find next step with duration > 0, skipping info-only steps
             const nextActiveIndex = findNextActiveStep(currentStepIndex + 1);
             const nextStep = steps[nextActiveIndex];
-            
+
             setCurrentStepIndex(nextActiveIndex);
-            
+
             // Check if this is the last step (Complete step or last timed step)
-            const isNextLastStep = nextActiveIndex === steps.length - 1 || 
+            const isNextLastStep = nextActiveIndex === steps.length - 1 ||
               (nextActiveIndex === steps.length - 2 && steps[steps.length - 1].duration === 0);
             setIsLastStep(isNextLastStep);
-            
+
             if (nextStep.duration === 0) {
               // This is the final "Complete" step - enter overtime mode
               setIsLastStep(true);
               return 0;
             }
-            
+
             return nextStep.duration;
           } else {
             // Already at last step, enter overtime mode
@@ -267,30 +271,42 @@ export default function BrewTimerContent({
         return prev - 1;
       });
     }, 1000);
-    
+
     return () => clearInterval(interval);
   }, [isRunning, timeRemaining, currentStepIndex, steps, playTickSound, playBellSound, findNextActiveStep, isLastStep]);
 
   const handleStart = () => {
     // Unlock AudioContext on user interaction (required for mobile browsers)
     getAudioContext();
-    
+
+    // Record brew session on first start (for popularity tracking)
+    if (!sessionRecordedRef.current) {
+      sessionRecordedRef.current = true;
+      const isTemplate = recipe.templateId !== undefined;
+      api.recipes.recordBrewStart(
+        isTemplate ? null : recipe.id,
+        isTemplate ? recipe.templateId : null,
+        recipe.name,
+        isTemplate ? 'community' : 'user'
+      ).catch(err => console.warn('Failed to record brew session:', err));
+    }
+
     // Skip any steps with duration 0 (info-only steps)
     const nextActiveIndex = findNextActiveStep(currentStepIndex === 0 ? 1 : currentStepIndex);
     const nextStep = steps[nextActiveIndex];
-    
+
     if (nextActiveIndex !== currentStepIndex) {
       setCurrentStepIndex(nextActiveIndex);
       setTimeRemaining(nextStep?.duration || 0);
     }
-    
+
     // If the step has no duration, mark as complete
     if (nextStep?.duration === 0) {
       setIsComplete(true);
     } else {
       setIsRunning(true);
     }
-    
+
     playNotificationSound();
   };
 
@@ -350,9 +366,9 @@ export default function BrewTimerContent({
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2">
             {onBack && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="h-8 w-8 -ml-2"
                 onClick={onBack}
                 title="Back"
@@ -364,9 +380,9 @@ export default function BrewTimerContent({
             {recipe.name}
           </CardTitle>
           {showCloseButton && onClose && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={onClose}
               title="Close"
             >
@@ -423,7 +439,7 @@ export default function BrewTimerContent({
               <p className="text-lg text-muted-foreground leading-snug mt-1">{currentStep?.description}</p>
             </div>
           </div>
-          
+
           {/* Always show the timer circle and controls */}
           {currentStep && (
             <>
@@ -450,29 +466,27 @@ export default function BrewTimerContent({
                       stroke="currentColor"
                       strokeWidth="10"
                       fill="none"
-                      className={`transition-all duration-1000 ${
-                        isComplete
+                      className={`transition-all duration-1000 ${isComplete
                           ? 'text-orange-500'
-                          : overtimeSeconds > 0 
-                          ? 'text-blue-500' 
-                          : timeRemaining <= 5 && timeRemaining > 0 
-                          ? 'text-orange-500' 
-                          : 'text-primary'
-                      }`}
+                          : overtimeSeconds > 0
+                            ? 'text-blue-500'
+                            : timeRemaining <= 5 && timeRemaining > 0
+                              ? 'text-orange-500'
+                              : 'text-primary'
+                        }`}
                       strokeDasharray={`${2 * Math.PI * 150}`}
-                      strokeDashoffset={`${
-                        2 * Math.PI * 150 * (1 - (isComplete
+                      strokeDashoffset={`${2 * Math.PI * 150 * (1 - (isComplete
                           ? 1
-                          : overtimeSeconds > 0 
-                          ? 0 
-                          : currentStep.duration > 0 
-                          ? timeRemaining / currentStep.duration 
-                          : 0))
-                      }`}
+                          : overtimeSeconds > 0
+                            ? 0
+                            : currentStep.duration > 0
+                              ? timeRemaining / currentStep.duration
+                              : 0))
+                        }`}
                       strokeLinecap="round"
                     />
                   </svg>
-                  
+
                   {/* Content inside circle */}
                   <div className="absolute inset-0 flex items-center justify-center py-6" style={{ marginTop: '-20px' }}>
                     {/* Show Start button in center when not started */}
@@ -522,15 +536,14 @@ export default function BrewTimerContent({
                             ) : null}
                           </div>
                         )}
-                        
+
                         {/* Main countdown timer - always centered */}
                         <div className="flex flex-col items-center justify-center gap-4">
-                          <div className={`font-bold tabular-nums text-center ${
-                            overtimeSeconds > 0 ? 'text-blue-500' : timeRemaining <= 5 && timeRemaining > 0 ? 'text-orange-500' : ''
-                          }`} style={{ fontSize: '6rem', lineHeight: 1 }}>
+                          <div className={`font-bold tabular-nums text-center ${overtimeSeconds > 0 ? 'text-blue-500' : timeRemaining <= 5 && timeRemaining > 0 ? 'text-orange-500' : ''
+                            }`} style={{ fontSize: '6rem', lineHeight: 1 }}>
                             {overtimeSeconds > 0 ? `+${formatTime(overtimeSeconds)}` : formatTime(timeRemaining)}
                           </div>
-                          
+
                           {/* Complete button during last step - below timer when no flow/water */}
                           {isLastStep && isRunning && (!currentStep.waterAmount || currentStep.waterAmount === 0) && (
                             <Button onClick={handleFinish} size="lg" className="h-12 px-8">
@@ -539,7 +552,7 @@ export default function BrewTimerContent({
                             </Button>
                           )}
                         </div>
-                        
+
                         {/* Flow rate and total water - absolutely positioned at bottom */}
                         {currentStep.waterAmount && currentStep.waterAmount > 0 && (
                           <div className="absolute bottom-16 left-1/2 transform -translate-x-1/2 flex gap-6 text-muted-foreground">
@@ -554,7 +567,7 @@ export default function BrewTimerContent({
                               <span className="text-3xl font-bold text-foreground">
                                 {(() => {
                                   // Calculate cumulative water up to previous steps
-                                  const previousWater = steps.slice(0, currentStepIndex).reduce((sum, s) => 
+                                  const previousWater = steps.slice(0, currentStepIndex).reduce((sum, s) =>
                                     sum + (s.waterAmount || 0), 0
                                   );
                                   // Calculate current step progress using custom or calculated flow rate
@@ -565,7 +578,7 @@ export default function BrewTimerContent({
                                 })()}
                                 <span className="text-xl text-muted-foreground">/{(() => {
                                   // Calculate target water at end of this step
-                                  const targetWater = steps.slice(0, currentStepIndex + 1).reduce((sum, s) => 
+                                  const targetWater = steps.slice(0, currentStepIndex + 1).reduce((sum, s) =>
                                     sum + (s.waterAmount || 0), 0
                                   );
                                   return targetWater;
@@ -591,35 +604,31 @@ export default function BrewTimerContent({
               // Calculate elapsed time at the start of this step
               const stepStartTime = steps.slice(0, index).reduce((sum, s) => sum + s.duration, 0);
               const isLast = index === steps.length - 1;
-              
+
               return (
                 <div key={index} className="flex gap-3">
                   {/* Timeline column */}
                   <div className="flex flex-col items-center">
                     {/* Time marker */}
-                    <div className={`text-base font-mono w-14 text-right ${
-                      index <= currentStepIndex ? 'text-primary font-bold' : 'text-muted-foreground'
-                    }`}>
+                    <div className={`text-base font-mono w-14 text-right ${index <= currentStepIndex ? 'text-primary font-bold' : 'text-muted-foreground'
+                      }`}>
                       {formatTime(stepStartTime)}
                     </div>
                     {/* Dot */}
-                    <div className={`w-3 h-3 rounded-full mt-1 ${
-                      index < currentStepIndex ? 'bg-primary' :
-                      index === currentStepIndex ? 'bg-primary ring-2 ring-primary/20' :
-                      'bg-muted-foreground/30'
-                    }`} />
+                    <div className={`w-3 h-3 rounded-full mt-1 ${index < currentStepIndex ? 'bg-primary' :
+                        index === currentStepIndex ? 'bg-primary ring-2 ring-primary/20' :
+                          'bg-muted-foreground/30'
+                      }`} />
                     {/* Line */}
                     {!isLast && (
-                      <div className={`w-0.5 flex-1 min-h-8 ${
-                        index < currentStepIndex ? 'bg-primary' : 'bg-muted-foreground/20'
-                      }`} />
+                      <div className={`w-0.5 flex-1 min-h-8 ${index < currentStepIndex ? 'bg-primary' : 'bg-muted-foreground/20'
+                        }`} />
                     )}
                   </div>
                   {/* Content */}
                   <div className={`flex-1 pb-4 ${index < currentStepIndex ? 'opacity-60' : ''}`}>
-                    <div className={`font-semibold text-lg leading-tight ${
-                      index === currentStepIndex ? 'text-primary' : ''
-                    }`}>
+                    <div className={`font-semibold text-lg leading-tight ${index === currentStepIndex ? 'text-primary' : ''
+                      }`}>
                       {step.title}
                     </div>
                     <div className="text-base text-muted-foreground leading-snug mt-1">
@@ -634,9 +643,9 @@ export default function BrewTimerContent({
 
         {/* Close Button */}
         {showCloseButton && onClose && (
-          <Button 
-            onClick={onClose} 
-            variant="outline" 
+          <Button
+            onClick={onClose}
+            variant="outline"
             className="w-full"
           >
             <X className="mr-2 h-4 w-4" />

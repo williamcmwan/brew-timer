@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Shield, Loader2, Timer } from "lucide-react";
+import { ArrowLeft, Plus, Pencil, Trash2, BookOpen, Shield, Loader2, Timer, Users, ChefHat, TrendingUp, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { BuyMeCoffee } from "@/components/BuyMeCoffee";
 import {
@@ -25,7 +25,7 @@ export default function Admin() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  
+
   const [adminKey, setAdminKey] = useState(searchParams.get('key') || '');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [templates, setTemplates] = useState<RecipeTemplate[]>([]);
@@ -35,6 +35,17 @@ export default function Admin() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<RecipeTemplate | null>(null);
+
+  // New state for expandable sections
+  const [showGuestUsers, setShowGuestUsers] = useState(false);
+  const [showUserRecipes, setShowUserRecipes] = useState(false);
+  const [showPopularRecipes, setShowPopularRecipes] = useState(false);
+  const [guestUsers, setGuestUsers] = useState<any[]>([]);
+  const [userRecipes, setUserRecipes] = useState<any[]>([]);
+  const [popularRecipes, setPopularRecipes] = useState<any[]>([]);
+  const [loadingGuestUsers, setLoadingGuestUsers] = useState(false);
+  const [loadingUserRecipes, setLoadingUserRecipes] = useState(false);
+  const [loadingPopularRecipes, setLoadingPopularRecipes] = useState(false);
 
   const authenticate = async (keyToUse?: string) => {
     const key = keyToUse || adminKey;
@@ -50,17 +61,17 @@ export default function Admin() {
     setIsLoading(true);
     try {
       console.log('Attempting authentication with key:', key);
-      
+
       // Use the API client instead of hardcoded URL
       const result = await api.admin.getStats(key);
       console.log('Authentication successful:', result);
       setIsAuthenticated(true);
       setStats(result);
-      
+
       // Load templates
       const templatesData = await api.admin.getTemplates(key);
       console.log('Templates loaded:', templatesData.map(t => ({ name: t.name, photo: t.photo })));
-      
+
       // Transform photo URLs for development
       const transformedTemplates = templatesData.map(template => ({
         ...template,
@@ -69,7 +80,7 @@ export default function Admin() {
           : template.photo
       }));
       setTemplates(transformedTemplates);
-      
+
       // Load shared recipes
       const sharedRecipesData = await api.admin.getSharedRecipes(key);
       // Transform photo URLs for shared recipes too
@@ -80,7 +91,7 @@ export default function Admin() {
           : recipe.photo
       }));
       setSharedRecipes(transformedSharedRecipes);
-      
+
     } catch (error) {
       console.error('Authentication failed:', error);
       toast({
@@ -101,6 +112,69 @@ export default function Admin() {
       authenticate(keyFromUrl);
     }
   }, [searchParams, isAuthenticated]);
+
+  // Load guest users data
+  const loadGuestUsers = async () => {
+    if (guestUsers.length > 0) return; // Already loaded
+    setLoadingGuestUsers(true);
+    try {
+      const data = await api.admin.getGuestUsers(adminKey);
+      setGuestUsers(data);
+    } catch (error) {
+      console.error('Error loading guest users:', error);
+    } finally {
+      setLoadingGuestUsers(false);
+    }
+  };
+
+  // Load user recipes data
+  const loadUserRecipes = async () => {
+    if (userRecipes.length > 0) return; // Already loaded
+    setLoadingUserRecipes(true);
+    try {
+      const data = await api.admin.getUserRecipes(adminKey);
+      setUserRecipes(data);
+    } catch (error) {
+      console.error('Error loading user recipes:', error);
+    } finally {
+      setLoadingUserRecipes(false);
+    }
+  };
+
+  // Load popular recipes data
+  const loadPopularRecipes = async () => {
+    if (popularRecipes.length > 0) return; // Already loaded
+    setLoadingPopularRecipes(true);
+    try {
+      const data = await api.admin.getPopularRecipes(adminKey);
+      setPopularRecipes(data);
+    } catch (error) {
+      console.error('Error loading popular recipes:', error);
+    } finally {
+      setLoadingPopularRecipes(false);
+    }
+  };
+
+  const handleGuestUsersClick = () => {
+    setShowGuestUsers(!showGuestUsers);
+    if (!showGuestUsers) {
+      loadGuestUsers();
+    }
+  };
+
+  const handleUserRecipesClick = () => {
+    setShowUserRecipes(!showUserRecipes);
+    if (!showUserRecipes) {
+      loadUserRecipes();
+    }
+  };
+
+  const handlePopularRecipesClick = () => {
+    setShowPopularRecipes(!showPopularRecipes);
+    if (!showPopularRecipes) {
+      loadPopularRecipes();
+    }
+  };
 
   const handleDelete = async (id: string) => {
     try {
@@ -135,7 +209,7 @@ export default function Admin() {
     try {
       const templatesData = await api.admin.getTemplates(adminKey);
       console.log('Templates reloaded:', templatesData.map(t => ({ name: t.name, photo: t.photo })));
-      
+
       // Transform photo URLs for development
       const transformedTemplates = templatesData.map(template => ({
         ...template,
@@ -222,8 +296,8 @@ export default function Admin() {
                   onKeyDown={(e) => e.key === 'Enter' && authenticate()}
                 />
               </div>
-              <Button 
-                onClick={() => authenticate()} 
+              <Button
+                onClick={() => authenticate()}
                 className="w-full"
                 disabled={isLoading}
               >
@@ -263,24 +337,207 @@ export default function Admin() {
 
         {/* Stats Cards */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold">{stats.templates}</div>
-                <p className="text-sm text-muted-foreground">Recipe Templates</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold">{stats.guestUsers}</div>
-                <p className="text-sm text-muted-foreground">Guest Users</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold">{stats.recipes}</div>
-                <p className="text-sm text-muted-foreground">User Recipes</p>
-              </CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold">{stats.templates}</div>
+                  <p className="text-sm text-muted-foreground">Recipe Templates</p>
+                </CardContent>
+              </Card>
+
+              {/* Clickable Guest Users Card */}
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={handleGuestUsersClick}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-2xl font-bold flex items-center gap-2">
+                        <Users className="h-5 w-5 text-blue-500" />
+                        {stats.guestUsers}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Guest Users</p>
+                    </div>
+                    {showGuestUsers ? (
+                      <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Clickable User Recipes Card */}
+              <Card
+                className="cursor-pointer hover:shadow-md transition-shadow"
+                onClick={handleUserRecipesClick}
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-2xl font-bold flex items-center gap-2">
+                        <ChefHat className="h-5 w-5 text-green-500" />
+                        {stats.recipes}
+                      </div>
+                      <p className="text-sm text-muted-foreground">User Recipes</p>
+                    </div>
+                    {showUserRecipes ? (
+                      <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Expanded Guest Users Section */}
+            {showGuestUsers && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-blue-500" />
+                    Guest Users by Registration Date
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingGuestUsers ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : guestUsers.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No guest users found</p>
+                  ) : (
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {guestUsers.map((group) => (
+                        <div key={group.date} className="border-b pb-3 last:border-b-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold text-sm">{group.date}</h4>
+                            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
+                              {group.count} user{group.count !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div className="space-y-1">
+                            {group.users.map((user: any) => (
+                              <div key={user.guestId} className="text-xs text-muted-foreground pl-2 flex justify-between">
+                                <span className="font-mono truncate max-w-[200px]">{user.guestId}</span>
+                                <span>{new Date(user.createdAt).toLocaleTimeString()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Expanded User Recipes Section */}
+            {showUserRecipes && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ChefHat className="h-5 w-5 text-green-500" />
+                    Recipes by User
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingUserRecipes ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : userRecipes.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No user recipes found</p>
+                  ) : (
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {userRecipes.map((userGroup) => (
+                        <div key={userGroup.guestId} className="border rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <span className="font-mono text-xs text-muted-foreground truncate block max-w-[250px]">
+                                {userGroup.guestId}
+                              </span>
+                              <span className="text-xs text-muted-foreground">
+                                Joined: {userGroup.userCreatedAt ? new Date(userGroup.userCreatedAt).toLocaleDateString() : 'Unknown'}
+                              </span>
+                            </div>
+                            <span className="text-xs bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-2 py-1 rounded-full">
+                              {userGroup.recipeCount} recipe{userGroup.recipeCount !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div className="space-y-1 pl-2 border-l-2 border-green-200 dark:border-green-800">
+                            {userGroup.recipes.map((recipe: any) => (
+                              <div key={recipe.id} className="text-sm flex justify-between items-center">
+                                <span className="font-medium">{recipe.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(recipe.createdAt).toLocaleDateString()}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Popular Recipes Card */}
+            <Card
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={handlePopularRecipesClick}
+            >
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-orange-500" />
+                    Popular Recipes
+                  </div>
+                  {showPopularRecipes ? (
+                    <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </CardTitle>
+              </CardHeader>
+              {showPopularRecipes && (
+                <CardContent>
+                  {loadingPopularRecipes ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : popularRecipes.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-4">No brew sessions recorded yet</p>
+                  ) : (
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {popularRecipes.map((recipe, index) => (
+                        <div key={`${recipe.recipeName}-${recipe.recipeType}-${index}`} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg font-bold text-muted-foreground w-6">#{index + 1}</span>
+                            <div>
+                              <span className="font-medium">{recipe.recipeName}</span>
+                              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${recipe.recipeType === 'community'
+                                  ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
+                                  : 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                                }`}>
+                                {recipe.recipeType}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-bold text-orange-500">{recipe.startCount}</span>
+                            <span className="text-xs text-muted-foreground ml-1">starts</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              )}
             </Card>
           </div>
         )}
@@ -321,8 +578,8 @@ export default function Admin() {
                               <p className="text-xs text-muted-foreground">Shared by: {recipe.guestId}</p>
                             </div>
                             <div className="flex gap-1 flex-shrink-0">
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 className="h-8"
                                 onClick={() => navigate('/brew-timer', { state: { recipe } })}
@@ -331,8 +588,8 @@ export default function Admin() {
                                 <Timer className="h-4 w-4 mr-1" />
                                 Preview
                               </Button>
-                              <Button 
-                                variant="default" 
+                              <Button
+                                variant="default"
                                 size="sm"
                                 className="h-8"
                                 onClick={() => handleApproveSharedRecipe(recipe.id)}
@@ -411,9 +668,9 @@ export default function Admin() {
                           <div className="flex justify-between items-start">
                             <h3 className="font-semibold text-lg">{template.name}</h3>
                             <div className="flex -mr-2 flex-shrink-0">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
+                              <Button
+                                variant="ghost"
+                                size="icon"
                                 className="h-8 w-8"
                                 onClick={() => handleEdit(template)}
                               >

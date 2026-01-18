@@ -46,14 +46,14 @@ const seedGuestRecipes = (guestId: string) => {
   try {
     // Check if guest already has recipes
     const existingRecipes = db.prepare('SELECT COUNT(*) as count FROM recipes WHERE guest_id = ?').get(guestId) as { count: number };
-    
+
     if (existingRecipes.count > 0) {
       return; // Guest already has recipes, don't seed
     }
 
     // Get all recipe templates
     const templates = db.prepare('SELECT * FROM recipe_templates').all() as any[];
-    
+
     if (templates.length === 0) {
       console.log('No recipe templates found to seed');
       return;
@@ -93,7 +93,7 @@ const seedGuestRecipes = (guestId: string) => {
 // Middleware to ensure guest user exists
 const ensureGuestUser = (req: any, res: any, next: any) => {
   const guestId = req.headers['x-guest-id'];
-  
+
   if (!guestId) {
     return res.status(400).json({ error: 'Guest ID required' });
   }
@@ -101,10 +101,10 @@ const ensureGuestUser = (req: any, res: any, next: any) => {
   // Create guest user if doesn't exist
   try {
     db.prepare('INSERT OR IGNORE INTO guest_users (guest_id) VALUES (?)').run(guestId);
-    
+
     // Note: No longer auto-seeding recipes from templates
     // Users can manually add community recipes to their collection
-    
+
     req.guestId = guestId;
     next();
   } catch (error) {
@@ -119,7 +119,7 @@ router.post('/upload-photo', ensureGuestUser, upload.single('photo'), (req: any,
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-    
+
     const relativePath = `/recipe-images/${req.file.filename}`;
     res.json({ path: relativePath });
   } catch (error) {
@@ -137,7 +137,7 @@ router.get('/templates', (req, res) => {
       FROM recipe_templates 
       ORDER BY name
     `);
-    
+
     const templates = stmt.all().map((template: any) => {
       return {
         id: template.id.toString(),
@@ -166,24 +166,24 @@ router.post('/from-template/:templateId', ensureGuestUser, (req: any, res) => {
   try {
     const { templateId } = req.params;
     const { name } = req.body; // Allow custom name
-    
+
     // Get template
     const templateStmt = db.prepare(`
       SELECT * FROM recipe_templates WHERE id = ?
     `);
     const template = templateStmt.get(templateId) as any;
-    
+
     if (!template) {
       return res.status(404).json({ error: 'Template not found' });
     }
-    
+
     // Create recipe from template
     const stmt = db.prepare(`
       INSERT INTO recipes (guest_id, name, ratio, dose, photo, process, process_steps, 
                           grind_size, water, yield, temperature, brew_time, brewing_method)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     const result = stmt.run(
       req.guestId,
       name || template.name,
@@ -233,7 +233,7 @@ router.get('/', ensureGuestUser, (req: any, res) => {
       WHERE guest_id = ? 
       ORDER BY favorite DESC, created_at DESC
     `);
-    
+
     const recipes = stmt.all(req.guestId).map((recipe: any) => ({
       id: recipe.id.toString(),
       name: recipe.name,
@@ -261,13 +261,13 @@ router.get('/', ensureGuestUser, (req: any, res) => {
 router.post('/', ensureGuestUser, (req: any, res) => {
   try {
     const { name, ratio, dose, photo, process, processSteps, water, temperature, brewTime, favorite, shareToCommunity, brewingMethod } = req.body;
-    
+
     const stmt = db.prepare(`
       INSERT INTO recipes (guest_id, name, ratio, dose, photo, process, process_steps, 
                           grind_size, water, yield, temperature, brew_time, favorite, share_to_community, brewing_method)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     const result = stmt.run(
       req.guestId,
       name,
@@ -314,14 +314,14 @@ router.put('/:id', ensureGuestUser, (req: any, res) => {
   try {
     const { id } = req.params;
     const { name, ratio, dose, photo, process, processSteps, water, temperature, brewTime, favorite, shareToCommunity, brewingMethod } = req.body;
-    
+
     const stmt = db.prepare(`
       UPDATE recipes 
       SET name = ?, ratio = ?, dose = ?, photo = ?, process = ?, process_steps = ?,
           grind_size = ?, water = ?, yield = ?, temperature = ?, brew_time = ?, favorite = ?, share_to_community = ?, brewing_method = ?
       WHERE id = ? AND guest_id = ?
     `);
-    
+
     const result = stmt.run(
       name,
       ratio,
@@ -356,7 +356,7 @@ router.put('/:id', ensureGuestUser, (req: any, res) => {
 router.delete('/:id', ensureGuestUser, (req: any, res) => {
   try {
     const { id } = req.params;
-    
+
     const stmt = db.prepare('DELETE FROM recipes WHERE id = ? AND guest_id = ?');
     const result = stmt.run(id, req.guestId);
 
@@ -375,13 +375,13 @@ router.delete('/:id', ensureGuestUser, (req: any, res) => {
 router.post('/:id/favorite', ensureGuestUser, (req: any, res) => {
   try {
     const { id } = req.params;
-    
+
     const stmt = db.prepare(`
       UPDATE recipes 
       SET favorite = CASE WHEN favorite = 1 THEN 0 ELSE 1 END
       WHERE id = ? AND guest_id = ?
     `);
-    
+
     const result = stmt.run(id, req.guestId);
 
     if (result.changes === 0) {
@@ -392,6 +392,35 @@ router.post('/:id/favorite', ensureGuestUser, (req: any, res) => {
   } catch (error) {
     console.error('Error toggling favorite:', error);
     res.status(500).json({ error: 'Failed to toggle favorite' });
+  }
+});
+
+// Record brew session start (for tracking popular recipes)
+router.post('/start-session', ensureGuestUser, (req: any, res) => {
+  try {
+    const { recipeId, templateId, recipeName, recipeType } = req.body;
+
+    if (!recipeName || !recipeType) {
+      return res.status(400).json({ error: 'Recipe name and type are required' });
+    }
+
+    const stmt = db.prepare(`
+      INSERT INTO brew_sessions (guest_id, recipe_id, template_id, recipe_name, recipe_type)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    stmt.run(
+      req.guestId,
+      recipeId || null,
+      templateId || null,
+      recipeName,
+      recipeType
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error recording brew session:', error);
+    res.status(500).json({ error: 'Failed to record brew session' });
   }
 });
 

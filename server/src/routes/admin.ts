@@ -41,15 +41,15 @@ const adminAuth = (req: any, res: any, next: any) => {
   console.log('Admin auth middleware hit:', req.path);
   const adminKey = req.headers['x-admin-key'] || req.query.key;
   const validAdminKey = process.env.ADMIN_KEY || 'coffee-admin-2024';
-  
+
   console.log('Admin key provided:', adminKey);
   console.log('Valid admin key:', validAdminKey);
-  
+
   if (!adminKey || adminKey !== validAdminKey) {
     console.log('Admin auth failed');
     return res.status(401).json({ error: 'Invalid admin key' });
   }
-  
+
   console.log('Admin auth successful');
   next();
 };
@@ -60,7 +60,7 @@ router.post('/upload-photo', adminAuth, upload.single('photo'), (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
     }
-    
+
     const relativePath = `/template-images/${req.file.filename}`;
     res.json({ path: relativePath });
   } catch (error) {
@@ -78,7 +78,7 @@ router.get('/templates', adminAuth, (req, res) => {
       FROM recipe_templates 
       ORDER BY name
     `);
-    
+
     const templates = stmt.all().map((template: any) => {
       return {
         id: template.id.toString(),
@@ -107,18 +107,18 @@ router.get('/templates', adminAuth, (req, res) => {
 // Create new recipe template
 router.post('/templates', adminAuth, (req, res) => {
   try {
-    const { 
-      name, ratio, dose, photo, process, processSteps, 
+    const {
+      name, ratio, dose, photo, process, processSteps,
       water, temperature, brewTime, brewingMethod
     } = req.body;
-    
+
     const stmt = db.prepare(`
       INSERT INTO recipe_templates 
       (name, ratio, dose, photo, process, process_steps, grind_size, water, yield, 
        temperature, brew_time, grinder_model, brewer_model, brewing_method, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
     `);
-    
+
     const result = stmt.run(
       name,
       ratio,
@@ -160,11 +160,11 @@ router.post('/templates', adminAuth, (req, res) => {
 router.put('/templates/:id', adminAuth, (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      name, ratio, dose, photo, process, processSteps, 
+    const {
+      name, ratio, dose, photo, process, processSteps,
       water, temperature, brewTime, brewingMethod
     } = req.body;
-    
+
     const stmt = db.prepare(`
       UPDATE recipe_templates 
       SET name = ?, ratio = ?, dose = ?, photo = ?, process = ?, process_steps = ?,
@@ -172,7 +172,7 @@ router.put('/templates/:id', adminAuth, (req, res) => {
           grinder_model = ?, brewer_model = ?, brewing_method = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
-    
+
     const result = stmt.run(
       name,
       ratio,
@@ -206,7 +206,7 @@ router.put('/templates/:id', adminAuth, (req, res) => {
 router.delete('/templates/:id', adminAuth, (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const stmt = db.prepare('DELETE FROM recipe_templates WHERE id = ?');
     const result = stmt.run(id);
 
@@ -227,7 +227,7 @@ router.get('/stats', adminAuth, (req, res) => {
     const templatesCount = db.prepare('SELECT COUNT(*) as count FROM recipe_templates').get() as any;
     const guestUsersCount = db.prepare('SELECT COUNT(*) as count FROM guest_users').get() as any;
     const recipesCount = db.prepare('SELECT COUNT(*) as count FROM recipes').get() as any;
-    
+
     const recentActivity = db.prepare(`
       SELECT 'recipe' as type, name, created_at 
       FROM recipes 
@@ -257,7 +257,7 @@ router.get('/shared-recipes', adminAuth, (req, res) => {
       WHERE r.share_to_community = 1
       ORDER BY r.created_at DESC
     `);
-    
+
     const sharedRecipes = stmt.all().map((recipe: any) => ({
       id: recipe.id.toString(),
       guestId: recipe.guest_id,
@@ -285,23 +285,23 @@ router.get('/shared-recipes', adminAuth, (req, res) => {
 router.post('/shared-recipes/:id/approve', adminAuth, (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Get the recipe
     const recipe = db.prepare(`
       SELECT * FROM recipes WHERE id = ? AND share_to_community = 1
     `).get(id) as any;
-    
+
     if (!recipe) {
       return res.status(404).json({ error: 'Shared recipe not found' });
     }
-    
+
     // Create template from recipe
     const insertStmt = db.prepare(`
       INSERT INTO recipe_templates (name, ratio, dose, photo, process, process_steps,
                                    water, temperature, brew_time, brewing_method)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     const result = insertStmt.run(
       recipe.name,
       recipe.ratio,
@@ -314,12 +314,12 @@ router.post('/shared-recipes/:id/approve', adminAuth, (req, res) => {
       recipe.brew_time,
       recipe.brewing_method
     );
-    
+
     // Unmark the recipe as shared (it's now approved)
     db.prepare(`
       UPDATE recipes SET share_to_community = 0 WHERE id = ?
     `).run(id);
-    
+
     res.json({
       success: true,
       templateId: result.lastInsertRowid.toString()
@@ -334,20 +334,141 @@ router.post('/shared-recipes/:id/approve', adminAuth, (req, res) => {
 router.post('/shared-recipes/:id/reject', adminAuth, (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Unmark the recipe as shared
     const result = db.prepare(`
       UPDATE recipes SET share_to_community = 0 WHERE id = ? AND share_to_community = 1
     `).run(id);
-    
+
     if (result.changes === 0) {
       return res.status(404).json({ error: 'Shared recipe not found' });
     }
-    
+
     res.json({ success: true });
   } catch (error) {
     console.error('Error rejecting shared recipe:', error);
     res.status(500).json({ error: 'Failed to reject shared recipe' });
+  }
+});
+
+// Get guest users grouped by date (descending)
+router.get('/guest-users', adminAuth, (req, res) => {
+  try {
+    const users = db.prepare(`
+      SELECT guest_id, created_at,
+             DATE(created_at) as registration_date
+      FROM guest_users
+      ORDER BY created_at DESC
+    `).all() as any[];
+
+    // Group by date
+    const grouped: Record<string, { date: string; count: number; users: any[] }> = {};
+
+    users.forEach((user: any) => {
+      const date = user.registration_date;
+      if (!grouped[date]) {
+        grouped[date] = { date, count: 0, users: [] };
+      }
+      grouped[date].count++;
+      grouped[date].users.push({
+        guestId: user.guest_id,
+        createdAt: user.created_at
+      });
+    });
+
+    // Convert to array sorted by date desc
+    const result = Object.values(grouped).sort((a, b) =>
+      b.date.localeCompare(a.date)
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching guest users:', error);
+    res.status(500).json({ error: 'Failed to fetch guest users' });
+  }
+});
+
+// Get all user recipes organized by user
+router.get('/user-recipes', adminAuth, (req, res) => {
+  try {
+    const recipes = db.prepare(`
+      SELECT r.id, r.guest_id, r.name, r.ratio, r.dose, r.water, 
+             r.temperature, r.brew_time, r.created_at,
+             g.created_at as user_created_at
+      FROM recipes r
+      LEFT JOIN guest_users g ON r.guest_id = g.guest_id
+      ORDER BY r.created_at DESC
+    `).all() as any[];
+
+    // Group by user
+    const grouped: Record<string, {
+      guestId: string;
+      userCreatedAt: string;
+      recipeCount: number;
+      latestRecipeDate: string;
+      recipes: any[]
+    }> = {};
+
+    recipes.forEach((recipe: any) => {
+      const guestId = recipe.guest_id;
+      if (!grouped[guestId]) {
+        grouped[guestId] = {
+          guestId,
+          userCreatedAt: recipe.user_created_at,
+          recipeCount: 0,
+          latestRecipeDate: recipe.created_at,
+          recipes: []
+        };
+      }
+      grouped[guestId].recipeCount++;
+      grouped[guestId].recipes.push({
+        id: recipe.id.toString(),
+        name: recipe.name,
+        ratio: recipe.ratio,
+        dose: recipe.dose,
+        water: recipe.water,
+        temperature: recipe.temperature,
+        brewTime: recipe.brew_time,
+        createdAt: recipe.created_at
+      });
+    });
+
+    // Convert to array sorted by latest recipe date desc
+    const result = Object.values(grouped).sort((a, b) =>
+      b.latestRecipeDate.localeCompare(a.latestRecipeDate)
+    );
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching user recipes:', error);
+    res.status(500).json({ error: 'Failed to fetch user recipes' });
+  }
+});
+
+// Get popular recipes by start count
+router.get('/popular-recipes', adminAuth, (req, res) => {
+  try {
+    const popular = db.prepare(`
+      SELECT recipe_name, recipe_type, recipe_id, template_id,
+             COUNT(*) as start_count
+      FROM brew_sessions
+      GROUP BY recipe_name, recipe_type, recipe_id, template_id
+      ORDER BY start_count DESC
+      LIMIT 50
+    `).all() as any[];
+
+    const result = popular.map((item: any) => ({
+      recipeName: item.recipe_name,
+      recipeType: item.recipe_type,
+      recipeId: item.recipe_id?.toString() || null,
+      templateId: item.template_id?.toString() || null,
+      startCount: item.start_count
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error fetching popular recipes:', error);
+    res.status(500).json({ error: 'Failed to fetch popular recipes' });
   }
 });
 

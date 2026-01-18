@@ -1,6 +1,6 @@
 // In production, use relative URLs since server serves both API and static files
 // In development, use VITE_API_URL or default to localhost:3005
-const API_BASE_URL = import.meta.env.PROD 
+const API_BASE_URL = import.meta.env.PROD
   ? '' // Empty string for relative URLs in production
   : (import.meta.env.VITE_API_URL || 'http://localhost:3005');
 
@@ -26,20 +26,20 @@ class ApiClient {
 
   private async request(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseURL}${endpoint}`;
-    
+
     // Merge headers properly
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'X-Guest-ID': this.guestId,
     };
-    
+
     // Add any additional headers from options
     if (options.headers) {
       Object.entries(options.headers).forEach(([key, value]) => {
         headers[key] = value as string;
       });
     }
-    
+
     const config: RequestInit = {
       ...options,
       headers,
@@ -47,12 +47,12 @@ class ApiClient {
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
-      
+
       return await response.json();
     } catch (error) {
       console.error('API request failed:', error);
@@ -83,6 +83,12 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ name }),
     }),
+    // Brew session tracking
+    recordBrewStart: (recipeId: string | null, templateId: string | null, recipeName: string, recipeType: 'user' | 'community') =>
+      this.request('/api/recipes/start-session', {
+        method: 'POST',
+        body: JSON.stringify({ recipeId, templateId, recipeName, recipeType }),
+      }),
   };
 
   // Admin endpoints
@@ -116,6 +122,15 @@ class ApiClient {
     }),
     rejectSharedRecipe: (adminKey: string, id: string) => this.request(`/api/admin/shared-recipes/${id}/reject`, {
       method: 'POST',
+      headers: { 'X-Admin-Key': adminKey },
+    }),
+    getGuestUsers: (adminKey: string) => this.request('/api/admin/guest-users', {
+      headers: { 'X-Admin-Key': adminKey },
+    }),
+    getUserRecipes: (adminKey: string) => this.request('/api/admin/user-recipes', {
+      headers: { 'X-Admin-Key': adminKey },
+    }),
+    getPopularRecipes: (adminKey: string) => this.request('/api/admin/popular-recipes', {
       headers: { 'X-Admin-Key': adminKey },
     }),
   };

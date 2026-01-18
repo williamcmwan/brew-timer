@@ -55,6 +55,17 @@ export function initializeDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (guest_id) REFERENCES guest_users(guest_id)
     );
+
+    CREATE TABLE IF NOT EXISTS brew_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guest_id TEXT NOT NULL,
+      recipe_id INTEGER,
+      template_id INTEGER,
+      recipe_name TEXT NOT NULL,
+      recipe_type TEXT NOT NULL,
+      started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (guest_id) REFERENCES guest_users(guest_id)
+    );
   `);
 
   console.log('Database initialized for Coffee Timer');
