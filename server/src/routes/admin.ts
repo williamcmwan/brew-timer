@@ -351,37 +351,48 @@ router.post('/shared-recipes/:id/reject', adminAuth, (req, res) => {
   }
 });
 
-// Get guest users grouped by date (descending)
+// Get guest users grouped by date with hourly breakdown
 router.get('/guest-users', adminAuth, (req, res) => {
   try {
     const users = db.prepare(`
       SELECT guest_id, created_at,
-             DATE(created_at) as registration_date
+             DATE(created_at) as registration_date,
+             strftime('%H', created_at) as registration_hour
       FROM guest_users
       ORDER BY created_at DESC
     `).all() as any[];
 
-    // Group by date
-    const grouped: Record<string, { date: string; count: number; users: any[] }> = {};
+    // Overall hourly distribution (all dates combined)
+    const overallHourly: number[] = new Array(24).fill(0);
+
+    // Group by date with hourly breakdown
+    const byDate: Record<string, { date: string; count: number; hourly: number[] }> = {};
 
     users.forEach((user: any) => {
       const date = user.registration_date;
-      if (!grouped[date]) {
-        grouped[date] = { date, count: 0, users: [] };
+      const hour = parseInt(user.registration_hour, 10);
+
+      // Add to overall hourly
+      overallHourly[hour]++;
+
+      // Add to per-date hourly
+      if (!byDate[date]) {
+        byDate[date] = { date, count: 0, hourly: new Array(24).fill(0) };
       }
-      grouped[date].count++;
-      grouped[date].users.push({
-        guestId: user.guest_id,
-        createdAt: user.created_at
-      });
+      byDate[date].count++;
+      byDate[date].hourly[hour]++;
     });
 
     // Convert to array sorted by date desc
-    const result = Object.values(grouped).sort((a, b) =>
+    const dateGroups = Object.values(byDate).sort((a, b) =>
       b.date.localeCompare(a.date)
     );
 
-    res.json(result);
+    res.json({
+      totalUsers: users.length,
+      overallHourly,
+      byDate: dateGroups
+    });
   } catch (error) {
     console.error('Error fetching guest users:', error);
     res.status(500).json({ error: 'Failed to fetch guest users' });

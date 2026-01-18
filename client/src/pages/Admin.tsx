@@ -399,7 +399,7 @@ export default function Admin() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5 text-blue-500" />
-                    Guest Users by Registration Date
+                    Guest Users by Registration Hour
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -407,28 +407,65 @@ export default function Admin() {
                     <div className="flex items-center justify-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
-                  ) : guestUsers.length === 0 ? (
+                  ) : !guestUsers || (guestUsers as any).totalUsers === 0 ? (
                     <p className="text-center text-muted-foreground py-4">No guest users found</p>
                   ) : (
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {guestUsers.map((group) => (
-                        <div key={group.date} className="border-b pb-3 last:border-b-0">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold text-sm">{group.date}</h4>
-                            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
-                              {group.count} user{group.count !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          <div className="space-y-1">
-                            {group.users.map((user: any) => (
-                              <div key={user.guestId} className="text-xs text-muted-foreground pl-2 flex justify-between">
-                                <span className="font-mono truncate max-w-[200px]">{user.guestId}</span>
-                                <span>{new Date(user.createdAt).toLocaleTimeString()}</span>
-                              </div>
-                            ))}
-                          </div>
+                    <div className="space-y-6">
+                      {/* Overall 24-hour chart */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold text-sm">All Time ({(guestUsers as any).totalUsers} users)</h4>
                         </div>
-                      ))}
+                        <div className="flex items-end gap-0.5 h-16 bg-muted/30 rounded p-1">
+                          {((guestUsers as any).overallHourly || []).map((count: number, hour: number) => {
+                            const maxCount = Math.max(...((guestUsers as any).overallHourly || [1]));
+                            const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                            return (
+                              <div
+                                key={hour}
+                                className="flex-1 bg-blue-500 rounded-t transition-all hover:bg-blue-600"
+                                style={{ height: `${Math.max(height, count > 0 ? 10 : 0)}%` }}
+                                title={`${hour}:00 - ${count} user${count !== 1 ? 's' : ''}`}
+                              />
+                            );
+                          })}
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                          <span>0:00</span>
+                          <span>6:00</span>
+                          <span>12:00</span>
+                          <span>18:00</span>
+                          <span>24:00</span>
+                        </div>
+                      </div>
+
+                      {/* Per-date charts */}
+                      <div className="space-y-4 max-h-80 overflow-y-auto border-t pt-4">
+                        {((guestUsers as any).byDate || []).map((group: any) => (
+                          <div key={group.date} className="pb-3 last:border-b-0">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-semibold text-sm">{group.date}</h4>
+                              <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">
+                                {group.count} user{group.count !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <div className="flex items-end gap-0.5 h-10 bg-muted/30 rounded p-1">
+                              {(group.hourly || []).map((count: number, hour: number) => {
+                                const maxCount = Math.max(...(group.hourly || [1]));
+                                const height = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                                return (
+                                  <div
+                                    key={hour}
+                                    className="flex-1 bg-blue-400 rounded-t transition-all hover:bg-blue-500"
+                                    style={{ height: `${Math.max(height, count > 0 ? 15 : 0)}%` }}
+                                    title={`${hour}:00 - ${count} user${count !== 1 ? 's' : ''}`}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </CardContent>
@@ -521,8 +558,8 @@ export default function Admin() {
                             <div>
                               <span className="font-medium">{recipe.recipeName}</span>
                               <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${recipe.recipeType === 'community'
-                                  ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
-                                  : 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
+                                ? 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300'
+                                : 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
                                 }`}>
                                 {recipe.recipeType}
                               </span>
