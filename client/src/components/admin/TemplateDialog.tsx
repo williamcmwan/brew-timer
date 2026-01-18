@@ -9,8 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, X } from "lucide-react";
+import { Plus, Minus } from "lucide-react";
 import type { RecipeTemplate, RecipeStep } from "@/contexts/AppContext";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const templateSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100),
@@ -278,6 +284,44 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
     setElapsedTimeInputs(prev => ({ ...prev, [newIndex]: "30" }));
   };
 
+  const insertStepBefore = (index: number) => {
+    const newSteps = [...processSteps];
+    newSteps.splice(index, 0, { description: "", waterAmount: 0, duration: 30 });
+    setProcessSteps(newSteps);
+    
+    // Shift elapsed time inputs for steps at and after the insertion point
+    const newInputs: Record<number, string> = {};
+    Object.keys(elapsedTimeInputs).forEach(key => {
+      const keyNum = parseInt(key, 10);
+      if (keyNum < index) {
+        newInputs[keyNum] = elapsedTimeInputs[keyNum];
+      } else {
+        newInputs[keyNum + 1] = elapsedTimeInputs[keyNum];
+      }
+    });
+    newInputs[index] = "30";
+    setElapsedTimeInputs(newInputs);
+  };
+
+  const insertStepAfter = (index: number) => {
+    const newSteps = [...processSteps];
+    newSteps.splice(index + 1, 0, { description: "", waterAmount: 0, duration: 30 });
+    setProcessSteps(newSteps);
+    
+    // Shift elapsed time inputs for steps after the insertion point
+    const newInputs: Record<number, string> = {};
+    Object.keys(elapsedTimeInputs).forEach(key => {
+      const keyNum = parseInt(key, 10);
+      if (keyNum <= index) {
+        newInputs[keyNum] = elapsedTimeInputs[keyNum];
+      } else {
+        newInputs[keyNum + 1] = elapsedTimeInputs[keyNum];
+      }
+    });
+    newInputs[index + 1] = "30";
+    setElapsedTimeInputs(newInputs);
+  };
+
   const removeStep = (index: number) => {
     if (processSteps.length > 1) {
       setProcessSteps(processSteps.filter((_, i) => i !== index));
@@ -426,104 +470,159 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
 
           <div className="space-y-2">
             <Label>Process Steps *</Label>
-            <div className="space-y-3">
-              {processSteps.map((step, index) => (
-                <div key={index} className="p-3 border rounded-lg space-y-2 bg-muted/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Step {index + 1}</span>
-                    {processSteps.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeStep(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+            <TooltipProvider delayDuration={300}>
+              <div className="space-y-3">
+                {processSteps.map((step, index) => (
+                  <div key={index} className="relative group/step">
+                    {/* Floating action buttons on the left */}
+                    <div className="absolute left-0 top-0 -translate-x-1/2 opacity-0 group-hover/step:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
+                      {/* Add step before button */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => insertStepBefore(index)}
+                            className="w-5 h-5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center shadow-lg transition-colors pointer-events-auto"
+                          >
+                            <Plus className="h-2.5 w-2.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="border-0 bg-black/80 text-white shadow-none px-2 py-1 text-xs">
+                          <p>Add step before</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 opacity-0 group-hover/step:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
+                      {/* Remove step button - only show if more than 1 step */}
+                      {processSteps.length > 1 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => removeStep(index)}
+                              className="w-5 h-5 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 flex items-center justify-center shadow-lg transition-colors pointer-events-auto"
+                            >
+                              <Minus className="h-2.5 w-2.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="border-0 bg-black/80 text-white shadow-none px-2 py-1 text-xs">
+                            <p>Remove step</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                    
+                    <div className="absolute left-0 bottom-0 -translate-x-1/2 opacity-0 group-hover/step:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
+                      {/* Add step after button */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={() => insertStepAfter(index)}
+                            className="w-5 h-5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center shadow-lg transition-colors pointer-events-auto"
+                          >
+                            <Plus className="h-2.5 w-2.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="border-0 bg-black/80 text-white shadow-none px-2 py-1 text-xs">
+                          <p>Add step after</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    
+                    <div className="p-3 border rounded-lg space-y-2 bg-muted/30">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Step {index + 1}</span>
+                      </div>
                   <Input
                     placeholder="Description (e.g., Bloom, Main pour)"
                     value={step.description}
                     onChange={(e) => updateStep(index, "description", e.target.value)}
                   />
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <Label className="text-xs">Cumulative Water (g)</Label>
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        value={(() => {
-                          const cumulativeWater = processSteps.slice(0, index + 1).reduce((sum, s) => sum + (s.waterAmount || 0), 0);
-                          return cumulativeWater || "";
-                        })()}
-                        onChange={(e) => {
-                          const cumulativeValue = parseFloat(e.target.value) || 0;
-                          const previousWater = processSteps.slice(0, index).reduce((sum, s) => sum + (s.waterAmount || 0), 0);
-                          const stepWater = cumulativeValue - previousWater;
-                          updateStep(index, "waterAmount", stepWater);
-                        }}
-                      />
+                      <Label className="text-xs">Cumulative Water</Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          className="pr-6"
+                          value={(() => {
+                            const cumulativeWater = processSteps.slice(0, index + 1).reduce((sum, s) => sum + (s.waterAmount || 0), 0);
+                            return cumulativeWater || "";
+                          })()}
+                          onChange={(e) => {
+                            const cumulativeValue = parseFloat(e.target.value) || 0;
+                            const previousWater = processSteps.slice(0, index).reduce((sum, s) => sum + (s.waterAmount || 0), 0);
+                            const stepWater = cumulativeValue - previousWater;
+                            updateStep(index, "waterAmount", stepWater);
+                          }}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g</span>
+                      </div>
                     </div>
                     <div>
-                      <Label className="text-xs">Elapsed Time (s)</Label>
-                      <Input
-                        type="text"
-                        placeholder="30 or 1:30"
-                        value={elapsedTimeInputs[index] ?? formatDuration(step.duration)}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setElapsedTimeInputs(prev => ({ ...prev, [index]: val }));
-                          const seconds = parseDuration(val);
-                          updateStep(index, "duration", seconds);
-                        }}
-                      />
+                      <Label className="text-xs">Elapsed Time</Label>
+                      <div className="relative">
+                        <Input
+                          type="text"
+                          placeholder="30"
+                          className="pr-6"
+                          value={elapsedTimeInputs[index] ?? formatDuration(step.duration)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setElapsedTimeInputs(prev => ({ ...prev, [index]: val }));
+                            const seconds = parseDuration(val);
+                            updateStep(index, "duration", seconds);
+                          }}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">s</span>
+                      </div>
                     </div>
-                  </div>
-                  {/* Flow Rate field - optional override */}
-                  <div className="mt-2">
-                    <Label className="text-xs">Flow Rate (g/s) - Optional</Label>
-                    <Input
-                      type="number"
-                      step="0.1"
-                      placeholder={(() => {
-                        // step.waterAmount is per-step water
-                        // step.duration is cumulative elapsed time (not per-step!)
-                        const currentElapsed = step.duration || 0;
-                        const previousElapsed = index > 0 ? (processSteps[index - 1]?.duration || 0) : 0;
-                        const stepDuration = currentElapsed - previousElapsed;
-                        const stepWater = step.waterAmount || 0;
-                        return stepWater && stepDuration ? (stepWater / stepDuration).toFixed(1) : "Auto";
-                      })()}
-                      value={step.flowRate ?? ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        updateStep(index, "flowRate", val ? parseFloat(val) : undefined);
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Leave empty for auto-calculated ({(() => {
-                        const currentElapsed = step.duration || 0;
-                        const previousElapsed = index > 0 ? (processSteps[index - 1]?.duration || 0) : 0;
-                        const stepDuration = currentElapsed - previousElapsed;
-                        const stepWater = step.waterAmount || 0;
-                        return stepWater && stepDuration ? (stepWater / stepDuration).toFixed(1) : '0';
-                      })()} g/s)
-                    </p>
+                    <div>
+                      <Label className="text-xs">Flow Rate</Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          step="0.1"
+                          placeholder={(() => {
+                            const currentElapsed = step.duration || 0;
+                            const previousElapsed = index > 0 ? (processSteps[index - 1]?.duration || 0) : 0;
+                            const stepDuration = currentElapsed - previousElapsed;
+                            const stepWater = step.waterAmount || 0;
+                            return stepWater && stepDuration ? (stepWater / stepDuration).toFixed(1) : "Auto";
+                          })()}
+                          className="pr-8"
+                          value={step.flowRate ?? ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateStep(index, "flowRate", val ? parseFloat(val) : undefined);
+                          }}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g/s</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
+              </div>
               ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addStep}
-                className="w-full"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Add Step
-              </Button>
+              
+              {/* Add first step button - only show when no steps */}
+              {processSteps.length === 0 && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addStep}
+                  className="w-full"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Step
+                </Button>
+              )}
             </div>
+            </TooltipProvider>
           </div>
 
           <div className="flex gap-2 pt-4">
