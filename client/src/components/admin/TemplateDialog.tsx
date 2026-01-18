@@ -1,9 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { api } from "@/lib/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -74,8 +84,10 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
   const [brewingMethod, setBrewingMethod] = useState("");
   const [customBrewingMethod, setCustomBrewingMethod] = useState("");
 
-  // Track which field was last manually edited to determine auto-calculation direction
-  const [lastEditedField, setLastEditedField] = useState<"ratio" | "water" | null>(null);
+  // State for water update confirmation dialog
+  const [showWaterUpdateDialog, setShowWaterUpdateDialog] = useState(false);
+  const [pendingWaterChange, setPendingWaterChange] = useState<{ oldWater: number; newWater: number } | null>(null);
+  const previousWaterRef = useRef<number | null>(null);
 
   // Brewing method options (sorted alphabetically)
   const brewingMethodOptions = [
@@ -154,24 +166,91 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
     return null;
   };
 
-  // Effect to auto-calculate based on last edited field
+  // Effect to auto-calculate water from dose and ratio
   useEffect(() => {
     if (!dose || dose <= 0) return;
 
-    if (lastEditedField === "ratio" || lastEditedField === null) {
-      // Calculate water from dose and ratio
-      const calculatedWater = calculateWaterFromRatio(dose, ratio);
-      if (calculatedWater !== null && calculatedWater !== water) {
-        setValue("water", calculatedWater);
+    // Calculate water from dose and ratio (when either changes)
+    const calculatedWater = calculateWaterFromRatio(dose, ratio);
+    if (calculatedWater !== null && calculatedWater !== water) {
+      setValue("water", calculatedWater);
+    }
+  }, [dose, ratio, setValue]);
+
+  // Handler to update step water amounts proportionally
+  const handleUpdateStepWater = (oldWater: number, newWater: number) => {
+    if (oldWater === 0 || newWater === 0) return;
+
+    const ratioValue = newWater / oldWater;
+    let newSteps = processSteps.map(step => ({
+      ...step,
+      waterAmount: Math.round((step.waterAmount || 0) * ratioValue)
+    }));
+
+    // Fix rounding errors to ensure total matches newWater
+    const currentSum = newSteps.reduce((sum, step) => sum + (step.waterAmount || 0), 0);
+    const difference = newWater - currentSum;
+
+    if (difference !== 0 && newSteps.length > 0) {
+      // Find the last step that has water to add the difference to
+      let targetIndex = -1;
+      for (let i = newSteps.length - 1; i >= 0; i--) {
+        if ((newSteps[i].waterAmount || 0) > 0) {
+          targetIndex = i;
+          break;
+        }
       }
-    } else if (lastEditedField === "water") {
-      // Calculate ratio from dose and water
-      const calculatedRatio = calculateRatioFromWater(dose, water);
-      if (calculatedRatio !== null && calculatedRatio !== ratio) {
-        setValue("ratio", calculatedRatio);
+
+      if (targetIndex === -1) {
+        targetIndex = newSteps.length - 1;
+      }
+
+      const targetStep = newSteps[targetIndex];
+      newSteps[targetIndex] = {
+        ...targetStep,
+        waterAmount: (targetStep.waterAmount || 0) + difference
+      };
+    }
+
+    setProcessSteps(newSteps);
+
+    toast({
+      title: "Steps updated",
+      description: `Water amounts in all steps have been adjusted proportionally.`
+    });
+  };
+
+  // Check if water changed and prompt user to update steps
+  const checkWaterChangeAndPrompt = () => {
+    const currentWater = water;
+    const prevWater = previousWaterRef.current;
+
+    if (
+      prevWater !== null &&
+      currentWater !== prevWater &&
+      processSteps.length > 0
+    ) {
+      const totalStepWater = processSteps.reduce((sum, step) => sum + (step.waterAmount || 0), 0);
+      if (totalStepWater > 0) {
+        setPendingWaterChange({ oldWater: prevWater, newWater: currentWater });
+        setShowWaterUpdateDialog(true);
       }
     }
-  }, [dose, ratio, water, lastEditedField, setValue]);
+
+    previousWaterRef.current = currentWater;
+  };
+
+  // Handler for dose/ratio blur
+  const handleDoseRatioBlur = () => {
+    setTimeout(() => {
+      checkWaterChangeAndPrompt();
+    }, 0);
+  };
+
+  // Handler for water field blur
+  const handleWaterBlur = () => {
+    checkWaterChangeAndPrompt();
+  };
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -279,12 +358,16 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
         });
         setElapsedTimeInputs(inputs);
       }
+      // Initialize the previous water reference
+      previousWaterRef.current = template.water;
     } else {
       reset();
       setBrewingMethod("");
       setCustomBrewingMethod("");
       setProcessSteps([{ description: "", waterAmount: 0, duration: 30 }]);
       setElapsedTimeInputs({ 0: "30" });
+      // Initialize the previous water reference for new templates
+      previousWaterRef.current = 240;
     }
   }, [template, reset]);
 
@@ -394,303 +477,336 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{template ? "Edit Template" : "Add Template"}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit, onFormError)} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Name *</Label>
-            <Input id="name" {...register("name")} placeholder="e.g., James Hoffmann V60" />
-            {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="brewingMethod">Brewing Method</Label>
-            <Select value={brewingMethod} onValueChange={setBrewingMethod}>
-              <SelectTrigger id="brewingMethod">
-                <SelectValue placeholder="Select brewing method" />
-              </SelectTrigger>
-              <SelectContent>
-                {brewingMethodOptions.map((method) => (
-                  <SelectItem key={method} value={method}>
-                    {method}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {brewingMethod === "Others" && (
-              <Input
-                placeholder="Enter custom brewing method"
-                value={customBrewingMethod}
-                onChange={(e) => setCustomBrewingMethod(e.target.value)}
-                className="mt-2"
-              />
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="process">Process Description</Label>
-            <Input id="process" {...register("process")} placeholder="Brief brewing method description" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{template ? "Edit Template" : "Add Template"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit(onSubmit, onFormError)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="temperature">Temp (°C) *</Label>
-              <Input
-                id="temperature"
-                type="number"
-                step="any"
-                {...register("temperature", { valueAsNumber: true })}
-              />
-              {errors.temperature && <p className="text-sm text-destructive">{errors.temperature.message}</p>}
+              <Label htmlFor="name">Name *</Label>
+              <Input id="name" {...register("name")} placeholder="e.g., James Hoffmann V60" />
+              {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="brewTime">Brew Time *</Label>
-              <Input id="brewTime" {...register("brewTime")} placeholder="3:00" />
-              {errors.brewTime && <p className="text-sm text-destructive">{errors.brewTime.message}</p>}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="ratio">Ratio *</Label>
-              <Input
-                id="ratio"
-                {...register("ratio")}
-                placeholder="1:16"
-                onFocus={() => setLastEditedField("ratio")}
-              />
-              {errors.ratio && <p className="text-sm text-destructive">{errors.ratio.message}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="dose">Dose (g) *</Label>
-              <Input
-                id="dose"
-                type="number"
-                step="any"
-                {...register("dose", { valueAsNumber: true })}
-              />
-              {errors.dose && <p className="text-sm text-destructive">{errors.dose.message}</p>}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="water">Water (g) *</Label>
-            <Input
-              id="water"
-              type="number"
-              step="any"
-              {...register("water", { valueAsNumber: true })}
-              onFocus={() => setLastEditedField("water")}
-            />
-            <p className="text-xs text-muted-foreground">Auto-calculated from dose & ratio, or edit to update ratio</p>
-            {errors.water && <p className="text-sm text-destructive">{errors.water.message}</p>}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="photoUpload">Photo</Label>
-            <div className="flex gap-2">
-              <Input
-                id="photoUpload"
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoUpload}
-                disabled={uploadingPhoto}
-                className="flex-1"
-              />
-              {uploadingPhoto && <span className="text-sm text-muted-foreground">Uploading...</span>}
-            </div>
-            {photo && (
-              <div className="mt-2">
-                <img
-                  src={photo}
-                  alt="Recipe preview"
-                  className="w-full h-32 object-cover rounded-lg border"
-                  onError={(e) => {
-                    e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3ENo image%3C/text%3E%3C/svg%3E';
-                  }}
+              <Label htmlFor="brewingMethod">Brewing Method</Label>
+              <Select value={brewingMethod} onValueChange={setBrewingMethod}>
+                <SelectTrigger id="brewingMethod">
+                  <SelectValue placeholder="Select brewing method" />
+                </SelectTrigger>
+                <SelectContent>
+                  {brewingMethodOptions.map((method) => (
+                    <SelectItem key={method} value={method}>
+                      {method}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {brewingMethod === "Others" && (
+                <Input
+                  placeholder="Enter custom brewing method"
+                  value={customBrewingMethod}
+                  onChange={(e) => setCustomBrewingMethod(e.target.value)}
+                  className="mt-2"
                 />
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="process">Process Description</Label>
+              <Input id="process" {...register("process")} placeholder="Brief brewing method description" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="temperature">Temp (°C) *</Label>
+                <Input
+                  id="temperature"
+                  type="number"
+                  step="any"
+                  {...register("temperature", { valueAsNumber: true })}
+                />
+                {errors.temperature && <p className="text-sm text-destructive">{errors.temperature.message}</p>}
               </div>
-            )}
-          </div>
 
-          <div className="space-y-2">
-            <Label>Process Steps *</Label>
-            <TooltipProvider delayDuration={300}>
-              <div className="space-y-3">
-                {processSteps.map((step, index) => (
-                  <div key={index} className="relative group/step">
-                    {/* Floating action buttons on the left */}
-                    <div className="absolute left-0 top-0 -translate-x-1/2 opacity-0 group-hover/step:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
-                      {/* Add step before button */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => insertStepBefore(index)}
-                            className="w-5 h-5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center shadow-lg transition-colors pointer-events-auto"
-                          >
-                            <Plus className="h-2.5 w-2.5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="border-0 bg-black/80 text-white shadow-none px-2 py-1 text-xs">
-                          <p>Add step before</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
+              <div className="space-y-2">
+                <Label htmlFor="brewTime">Brew Time *</Label>
+                <Input id="brewTime" {...register("brewTime")} placeholder="3:00" />
+                {errors.brewTime && <p className="text-sm text-destructive">{errors.brewTime.message}</p>}
+              </div>
+            </div>
 
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 opacity-0 group-hover/step:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
-                      {/* Remove step button - only show if more than 1 step */}
-                      {processSteps.length > 1 && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ratio">Ratio *</Label>
+                <Input
+                  id="ratio"
+                  {...register("ratio")}
+                  placeholder="1:16"
+                  onBlur={handleDoseRatioBlur}
+                />
+                {errors.ratio && <p className="text-sm text-destructive">{errors.ratio.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dose">Dose (g) *</Label>
+                <Input
+                  id="dose"
+                  type="number"
+                  step="any"
+                  {...register("dose", { valueAsNumber: true })}
+                  onBlur={handleDoseRatioBlur}
+                />
+                {errors.dose && <p className="text-sm text-destructive">{errors.dose.message}</p>}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="water">Water (g) *</Label>
+              <Input
+                id="water"
+                type="number"
+                step="any"
+                {...register("water", { valueAsNumber: true })}
+                onBlur={handleWaterBlur}
+              />
+              <p className="text-xs text-muted-foreground">Auto-calculated from dose & ratio</p>
+              {errors.water && <p className="text-sm text-destructive">{errors.water.message}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="photoUpload">Photo</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="photoUpload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                  disabled={uploadingPhoto}
+                  className="flex-1"
+                />
+                {uploadingPhoto && <span className="text-sm text-muted-foreground">Uploading...</span>}
+              </div>
+              {photo && (
+                <div className="mt-2">
+                  <img
+                    src={photo}
+                    alt="Recipe preview"
+                    className="w-full h-32 object-cover rounded-lg border"
+                    onError={(e) => {
+                      e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%23999"%3ENo image%3C/text%3E%3C/svg%3E';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Process Steps *</Label>
+              <TooltipProvider delayDuration={300}>
+                <div className="space-y-3">
+                  {processSteps.map((step, index) => (
+                    <div key={index} className="relative group/step">
+                      {/* Floating action buttons on the left */}
+                      <div className="absolute left-0 top-0 -translate-x-1/2 opacity-0 group-hover/step:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
+                        {/* Add step before button */}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
                               type="button"
-                              onClick={() => removeStep(index)}
-                              className="w-5 h-5 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 flex items-center justify-center shadow-lg transition-colors pointer-events-auto"
+                              onClick={() => insertStepBefore(index)}
+                              className="w-5 h-5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center shadow-lg transition-colors pointer-events-auto"
                             >
-                              <Minus className="h-2.5 w-2.5" />
+                              <Plus className="h-2.5 w-2.5" />
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="right" className="border-0 bg-black/80 text-white shadow-none px-2 py-1 text-xs">
-                            <p>Remove step</p>
+                            <p>Add step before</p>
                           </TooltipContent>
                         </Tooltip>
-                      )}
-                    </div>
-
-                    <div className="absolute left-0 bottom-0 -translate-x-1/2 opacity-0 group-hover/step:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
-                      {/* Add step after button */}
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => insertStepAfter(index)}
-                            className="w-5 h-5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center shadow-lg transition-colors pointer-events-auto"
-                          >
-                            <Plus className="h-2.5 w-2.5" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="border-0 bg-black/80 text-white shadow-none px-2 py-1 text-xs">
-                          <p>Add step after</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-
-                    <div className="p-3 border rounded-lg space-y-2 bg-muted/30">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Step {index + 1}</span>
                       </div>
-                      <Input
-                        placeholder="Description (e.g., Bloom, Main pour)"
-                        value={step.description}
-                        onChange={(e) => updateStep(index, "description", e.target.value)}
-                      />
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <Label className="text-xs">Cumulative Water</Label>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              placeholder="0"
-                              className="pr-6"
-                              value={(() => {
-                                const cumulativeWater = processSteps.slice(0, index + 1).reduce((sum, s) => sum + (s.waterAmount || 0), 0);
-                                return cumulativeWater || "";
-                              })()}
-                              onChange={(e) => {
-                                const cumulativeValue = parseFloat(e.target.value) || 0;
-                                const previousWater = processSteps.slice(0, index).reduce((sum, s) => sum + (s.waterAmount || 0), 0);
-                                const stepWater = cumulativeValue - previousWater;
-                                updateStep(index, "waterAmount", stepWater);
-                              }}
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g</span>
-                          </div>
+
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 opacity-0 group-hover/step:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
+                        {/* Remove step button - only show if more than 1 step */}
+                        {processSteps.length > 1 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={() => removeStep(index)}
+                                className="w-5 h-5 rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90 flex items-center justify-center shadow-lg transition-colors pointer-events-auto"
+                              >
+                                <Minus className="h-2.5 w-2.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="right" className="border-0 bg-black/80 text-white shadow-none px-2 py-1 text-xs">
+                              <p>Remove step</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+
+                      <div className="absolute left-0 bottom-0 -translate-x-1/2 opacity-0 group-hover/step:opacity-100 transition-opacity duration-150 pointer-events-none z-10">
+                        {/* Add step after button */}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => insertStepAfter(index)}
+                              className="w-5 h-5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 flex items-center justify-center shadow-lg transition-colors pointer-events-auto"
+                            >
+                              <Plus className="h-2.5 w-2.5" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="border-0 bg-black/80 text-white shadow-none px-2 py-1 text-xs">
+                            <p>Add step after</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+
+                      <div className="p-3 border rounded-lg space-y-2 bg-muted/30">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Step {index + 1}</span>
                         </div>
-                        <div>
-                          <Label className="text-xs">Elapsed Time</Label>
-                          <div className="relative">
-                            <Input
-                              type="text"
-                              placeholder="30"
-                              className="pr-6"
-                              value={elapsedTimeInputs[index] ?? formatDuration(step.duration)}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setElapsedTimeInputs(prev => ({ ...prev, [index]: val }));
-                                const seconds = parseDuration(val);
-                                updateStep(index, "duration", seconds);
-                              }}
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">s</span>
+                        <Input
+                          placeholder="Description (e.g., Bloom, Main pour)"
+                          value={step.description}
+                          onChange={(e) => updateStep(index, "description", e.target.value)}
+                        />
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <Label className="text-xs">Cumulative Water</Label>
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                className="pr-6"
+                                value={(() => {
+                                  const cumulativeWater = processSteps.slice(0, index + 1).reduce((sum, s) => sum + (s.waterAmount || 0), 0);
+                                  return cumulativeWater || "";
+                                })()}
+                                onChange={(e) => {
+                                  const cumulativeValue = parseFloat(e.target.value) || 0;
+                                  const previousWater = processSteps.slice(0, index).reduce((sum, s) => sum + (s.waterAmount || 0), 0);
+                                  const stepWater = cumulativeValue - previousWater;
+                                  updateStep(index, "waterAmount", stepWater);
+                                }}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g</span>
+                            </div>
                           </div>
-                        </div>
-                        <div>
-                          <Label className="text-xs">Flow Rate</Label>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              placeholder={(() => {
-                                const currentElapsed = step.duration || 0;
-                                const previousElapsed = index > 0 ? (processSteps[index - 1]?.duration || 0) : 0;
-                                const stepDuration = currentElapsed - previousElapsed;
-                                const stepWater = step.waterAmount || 0;
-                                return stepWater && stepDuration ? (stepWater / stepDuration).toFixed(1) : "Auto";
-                              })()}
-                              className="pr-8"
-                              value={step.flowRate ?? ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                updateStep(index, "flowRate", val ? parseFloat(val) : undefined);
-                              }}
-                            />
-                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g/s</span>
+                          <div>
+                            <Label className="text-xs">Elapsed Time</Label>
+                            <div className="relative">
+                              <Input
+                                type="text"
+                                placeholder="30"
+                                className="pr-6"
+                                value={elapsedTimeInputs[index] ?? formatDuration(step.duration)}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setElapsedTimeInputs(prev => ({ ...prev, [index]: val }));
+                                  const seconds = parseDuration(val);
+                                  updateStep(index, "duration", seconds);
+                                }}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">s</span>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-xs">Flow Rate</Label>
+                            <div className="relative">
+                              <Input
+                                type="number"
+                                step="0.1"
+                                placeholder={(() => {
+                                  const currentElapsed = step.duration || 0;
+                                  const previousElapsed = index > 0 ? (processSteps[index - 1]?.duration || 0) : 0;
+                                  const stepDuration = currentElapsed - previousElapsed;
+                                  const stepWater = step.waterAmount || 0;
+                                  return stepWater && stepDuration ? (stepWater / stepDuration).toFixed(1) : "Auto";
+                                })()}
+                                className="pr-8"
+                                value={step.flowRate ?? ''}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  updateStep(index, "flowRate", val ? parseFloat(val) : undefined);
+                                }}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">g/s</span>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
 
-                {/* Add first step button - only show when no steps */}
-                {processSteps.length === 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addStep}
-                    className="w-full"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Step
-                  </Button>
-                )}
-              </div>
-            </TooltipProvider>
-          </div>
+                  {/* Add first step button - only show when no steps */}
+                  {processSteps.length === 0 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addStep}
+                      className="w-full"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Step
+                    </Button>
+                  )}
+                </div>
+              </TooltipProvider>
+            </div>
 
-          <div className="flex gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1"
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" className="flex-1" disabled={isLoading}>
-              {isLoading ? "Saving..." : template ? "Update" : "Create"}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+            <div className="flex gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => onOpenChange(false)}
+                disabled={isLoading}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" disabled={isLoading}>
+                {isLoading ? "Saving..." : template ? "Update" : "Create"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert Dialog for updating step water amounts */}
+      <AlertDialog open={showWaterUpdateDialog} onOpenChange={setShowWaterUpdateDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Step Water Amounts?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You changed the total water from {pendingWaterChange?.oldWater}g to {pendingWaterChange?.newWater}g.
+              Would you like to proportionally adjust the water amounts in each step?
+              <br /><br />
+              Please review each step afterwards and update the descriptions as needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setPendingWaterChange(null);
+            }}>
+              No, keep current
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (pendingWaterChange) {
+                handleUpdateStepWater(pendingWaterChange.oldWater, pendingWaterChange.newWater);
+              }
+              setPendingWaterChange(null);
+            }}>
+              Yes, update steps
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
