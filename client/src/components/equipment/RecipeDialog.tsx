@@ -189,7 +189,12 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
     if (oldWater === 0 || newWater === 0) return;
 
     const ratioValue = newWater / oldWater;
-    let newSteps = processSteps.map(step => ({
+
+    // Create a deep copy of steps to modify
+    let newSteps = processSteps.map(step => ({ ...step }));
+
+    // First pass: Calculate proportional water for each step
+    newSteps = newSteps.map(step => ({
       ...step,
       waterAmount: Math.round((step.waterAmount || 0) * ratioValue)
     }));
@@ -200,7 +205,6 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
 
     if (difference !== 0 && newSteps.length > 0) {
       // Find the last step that has water to add the difference to
-      // We iterate backwards to find the last step with water > 0
       let targetIndex = -1;
       for (let i = newSteps.length - 1; i >= 0; i--) {
         if ((newSteps[i].waterAmount || 0) > 0) {
@@ -220,6 +224,78 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
         waterAmount: (targetStep.waterAmount || 0) + difference
       };
     }
+
+    // Update descriptions based on changes - handle both step amount and cumulative amount
+    // We need to calculate cumulative amounts for both old and new steps
+    let oldCumulative = 0;
+    let newCumulative = 0;
+
+    newSteps = newSteps.map((newStep, index) => {
+      const oldStep = processSteps[index];
+      const oldStepAmount = oldStep.waterAmount || 0;
+      const newStepAmount = newStep.waterAmount || 0;
+
+      oldCumulative += oldStepAmount;
+      newCumulative += newStepAmount;
+
+      let description = newStep.description;
+
+      const replacements: { start: number, end: number, oldVal: number, newVal: number }[] = [];
+
+      // Helper to find matches
+      const addMatches = (val: number, newVal: number) => {
+        if (val <= 0 || val === newVal) return;
+
+        // Regex to match value with optional unit
+        const regex = new RegExp(`\\b${val}\\s*(g|ml|grams|milliliters)?\\b`, 'gi');
+        let match;
+        while ((match = regex.exec(description)) !== null) {
+          replacements.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            oldVal: val,
+            newVal: newVal
+          });
+        }
+      };
+
+      addMatches(oldStepAmount, newStepAmount);
+      // Only check cumulative if it's different from step amount (avoid double counting)
+      if (oldCumulative !== oldStepAmount) {
+        addMatches(oldCumulative, newCumulative);
+      }
+
+      // Sort replacements by start index descending to allow in-place replacement
+      replacements.sort((a, b) => b.start - a.start);
+
+      // Apply replacements
+      let lastStart = description.length + 1;
+
+      replacements.forEach(rep => {
+        if (rep.end <= lastStart) { // Ensure no overlap with previously replaced (later) segment
+          const before = description.substring(0, rep.start);
+          const after = description.substring(rep.end);
+          const originalMatch = description.substring(rep.start, rep.end);
+          // Extract unit from original match
+          const unitMatch = originalMatch.match(/[a-z]+/i);
+          const unit = unitMatch ? unitMatch[0] : '';
+
+          // Extract spacing (unlikely to vary much but good for precision)
+          const numberPart = originalMatch.replace(/[a-z]+/i, '');
+          const spacing = numberPart.replace(/[0-9.]/g, '');
+
+          const replacementText = `${rep.newVal}${spacing}${unit}`;
+
+          description = before + replacementText + after;
+          lastStart = rep.start;
+        }
+      });
+
+      return {
+        ...newStep,
+        description
+      };
+    });
 
     setProcessSteps(newSteps);
 
@@ -342,55 +418,57 @@ export function RecipeDialog({ open, onOpenChange, recipe, isCloning = false }: 
   };
 
   useEffect(() => {
-    if (recipe) {
-      reset({
-        name: isCloning ? `${recipe.name} (Copy)` : recipe.name,
-        ratio: recipe.ratio,
-        dose: recipe.dose,
-        photo: recipe.photo || "",
-        process: recipe.process || "",
-        water: recipe.water,
-        temperature: recipe.temperature,
-        brewTime: recipe.brewTime,
-        brewingMethod: recipe.brewingMethod || "",
-      });
-      setShareToCommunity(recipe.shareToCommunity || false);
+    if (open) {
+      if (recipe) {
+        reset({
+          name: isCloning ? `${recipe.name} (Copy)` : recipe.name,
+          ratio: recipe.ratio,
+          dose: recipe.dose,
+          photo: recipe.photo || "",
+          process: recipe.process || "",
+          water: recipe.water,
+          temperature: recipe.temperature,
+          brewTime: recipe.brewTime,
+          brewingMethod: recipe.brewingMethod || "",
+        });
+        setShareToCommunity(recipe.shareToCommunity || false);
 
-      // Handle brewing method
-      if (recipe.brewingMethod) {
-        if (brewingMethodOptions.includes(recipe.brewingMethod)) {
-          setBrewingMethod(recipe.brewingMethod);
-          setCustomBrewingMethod("");
+        // Handle brewing method
+        if (recipe.brewingMethod) {
+          if (brewingMethodOptions.includes(recipe.brewingMethod)) {
+            setBrewingMethod(recipe.brewingMethod);
+            setCustomBrewingMethod("");
+          } else {
+            setBrewingMethod("Others");
+            setCustomBrewingMethod(recipe.brewingMethod);
+          }
         } else {
-          setBrewingMethod("Others");
-          setCustomBrewingMethod(recipe.brewingMethod);
+          setBrewingMethod("");
+          setCustomBrewingMethod("");
         }
+
+        if (recipe.processSteps && recipe.processSteps.length > 0) {
+          setProcessSteps([...recipe.processSteps]);
+          const inputs: Record<number, string> = {};
+          recipe.processSteps.forEach((step, index) => {
+            inputs[index] = formatDuration(step.duration);
+          });
+          setElapsedTimeInputs(inputs);
+        }
+        // Initialize the previous water reference
+        previousWaterRef.current = recipe.water;
       } else {
+        reset();
+        setShareToCommunity(false);
         setBrewingMethod("");
         setCustomBrewingMethod("");
+        setProcessSteps([{ description: "", waterAmount: 0, duration: 30 }]);
+        setElapsedTimeInputs({ 0: "30" });
+        // Initialize the previous water reference for new recipes
+        previousWaterRef.current = 240;
       }
-
-      if (recipe.processSteps && recipe.processSteps.length > 0) {
-        setProcessSteps([...recipe.processSteps]);
-        const inputs: Record<number, string> = {};
-        recipe.processSteps.forEach((step, index) => {
-          inputs[index] = formatDuration(step.duration);
-        });
-        setElapsedTimeInputs(inputs);
-      }
-      // Initialize the previous water reference
-      previousWaterRef.current = recipe.water;
-    } else {
-      reset();
-      setShareToCommunity(false);
-      setBrewingMethod("");
-      setCustomBrewingMethod("");
-      setProcessSteps([{ description: "", waterAmount: 0, duration: 30 }]);
-      setElapsedTimeInputs({ 0: "30" });
-      // Initialize the previous water reference for new recipes
-      previousWaterRef.current = 240;
     }
-  }, [recipe, isCloning, reset]);
+  }, [recipe, isCloning, reset, open]);
 
   const onSubmit = async (data: RecipeFormData) => {
     const finalBrewingMethod = brewingMethod === "Others" ? customBrewingMethod : brewingMethod;

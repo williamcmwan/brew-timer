@@ -182,7 +182,12 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
     if (oldWater === 0 || newWater === 0) return;
 
     const ratioValue = newWater / oldWater;
-    let newSteps = processSteps.map(step => ({
+
+    // Create a deep copy of steps to modify
+    let newSteps = processSteps.map(step => ({ ...step }));
+
+    // First pass: Calculate proportional water for each step
+    newSteps = newSteps.map(step => ({
       ...step,
       waterAmount: Math.round((step.waterAmount || 0) * ratioValue)
     }));
@@ -211,6 +216,78 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
         waterAmount: (targetStep.waterAmount || 0) + difference
       };
     }
+
+    // Update descriptions based on changes - handle both step amount and cumulative amount
+    // We need to calculate cumulative amounts for both old and new steps
+    let oldCumulative = 0;
+    let newCumulative = 0;
+
+    newSteps = newSteps.map((newStep, index) => {
+      const oldStep = processSteps[index];
+      const oldStepAmount = oldStep.waterAmount || 0;
+      const newStepAmount = newStep.waterAmount || 0;
+
+      oldCumulative += oldStepAmount;
+      newCumulative += newStepAmount;
+
+      let description = newStep.description;
+
+      const replacements: { start: number, end: number, oldVal: number, newVal: number }[] = [];
+
+      // Helper to find matches
+      const addMatches = (val: number, newVal: number) => {
+        if (val <= 0 || val === newVal) return;
+
+        // Regex to match value with optional unit
+        const regex = new RegExp(`\\b${val}\\s*(g|ml|grams|milliliters)?\\b`, 'gi');
+        let match;
+        while ((match = regex.exec(description)) !== null) {
+          replacements.push({
+            start: match.index,
+            end: match.index + match[0].length,
+            oldVal: val,
+            newVal: newVal
+          });
+        }
+      };
+
+      addMatches(oldStepAmount, newStepAmount);
+      // Only check cumulative if it's different from step amount (avoid double counting)
+      if (oldCumulative !== oldStepAmount) {
+        addMatches(oldCumulative, newCumulative);
+      }
+
+      // Sort replacements by start index descending to allow in-place replacement
+      replacements.sort((a, b) => b.start - a.start);
+
+      // Apply replacements
+      let lastStart = description.length + 1;
+
+      replacements.forEach(rep => {
+        if (rep.end <= lastStart) { // Ensure no overlap with previously replaced (later) segment
+          const before = description.substring(0, rep.start);
+          const after = description.substring(rep.end);
+          const originalMatch = description.substring(rep.start, rep.end);
+          // Extract unit from original match
+          const unitMatch = originalMatch.match(/[a-z]+/i);
+          const unit = unitMatch ? unitMatch[0] : '';
+
+          // Extract spacing (unlikely to vary much but good for precision)
+          const numberPart = originalMatch.replace(/[a-z]+/i, '');
+          const spacing = numberPart.replace(/[0-9.]/g, '');
+
+          const replacementText = `${rep.newVal}${spacing}${unit}`;
+
+          description = before + replacementText + after;
+          lastStart = rep.start;
+        }
+      });
+
+      return {
+        ...newStep,
+        description
+      };
+    });
 
     setProcessSteps(newSteps);
 
@@ -323,53 +400,55 @@ export function TemplateDialog({ open, onOpenChange, template, adminKey, onSave 
   };
 
   useEffect(() => {
-    if (template) {
-      reset({
-        name: template.name,
-        photo: template.photo || "",
-        process: template.process || "",
-        ratio: template.ratio,
-        dose: template.dose,
-        water: template.water,
-        temperature: template.temperature,
-        brewTime: template.brewTime,
-        brewingMethod: template.brewingMethod || "",
-      });
+    if (open) {
+      if (template) {
+        reset({
+          name: template.name,
+          photo: template.photo || "",
+          process: template.process || "",
+          ratio: template.ratio,
+          dose: template.dose,
+          water: template.water,
+          temperature: template.temperature,
+          brewTime: template.brewTime,
+          brewingMethod: template.brewingMethod || "",
+        });
 
-      // Handle brewing method
-      if (template.brewingMethod) {
-        if (brewingMethodOptions.includes(template.brewingMethod)) {
-          setBrewingMethod(template.brewingMethod);
-          setCustomBrewingMethod("");
+        // Handle brewing method
+        if (template.brewingMethod) {
+          if (brewingMethodOptions.includes(template.brewingMethod)) {
+            setBrewingMethod(template.brewingMethod);
+            setCustomBrewingMethod("");
+          } else {
+            setBrewingMethod("Others");
+            setCustomBrewingMethod(template.brewingMethod);
+          }
         } else {
-          setBrewingMethod("Others");
-          setCustomBrewingMethod(template.brewingMethod);
+          setBrewingMethod("");
+          setCustomBrewingMethod("");
         }
+
+        if (template.processSteps && template.processSteps.length > 0) {
+          setProcessSteps([...template.processSteps]);
+          const inputs: Record<number, string> = {};
+          template.processSteps.forEach((step, index) => {
+            inputs[index] = formatDuration(step.duration);
+          });
+          setElapsedTimeInputs(inputs);
+        }
+        // Initialize the previous water reference
+        previousWaterRef.current = template.water;
       } else {
+        reset();
         setBrewingMethod("");
         setCustomBrewingMethod("");
+        setProcessSteps([{ description: "", waterAmount: 0, duration: 30 }]);
+        setElapsedTimeInputs({ 0: "30" });
+        // Initialize the previous water reference for new templates
+        previousWaterRef.current = 240;
       }
-
-      if (template.processSteps && template.processSteps.length > 0) {
-        setProcessSteps([...template.processSteps]);
-        const inputs: Record<number, string> = {};
-        template.processSteps.forEach((step, index) => {
-          inputs[index] = formatDuration(step.duration);
-        });
-        setElapsedTimeInputs(inputs);
-      }
-      // Initialize the previous water reference
-      previousWaterRef.current = template.water;
-    } else {
-      reset();
-      setBrewingMethod("");
-      setCustomBrewingMethod("");
-      setProcessSteps([{ description: "", waterAmount: 0, duration: 30 }]);
-      setElapsedTimeInputs({ 0: "30" });
-      // Initialize the previous water reference for new templates
-      previousWaterRef.current = 240;
     }
-  }, [template, reset]);
+  }, [template, reset, open]);
 
   const onSubmit = async (data: TemplateFormData) => {
     setIsLoading(true);
